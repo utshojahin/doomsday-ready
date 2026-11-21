@@ -1,0 +1,62 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Movie {
+  id              String              @id @default(uuid())
+  title           String              @unique
+  releaseYear     Int
+  runtimeMinutes  Int
+  watched         Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Self-referential prerequisite relations
+  // Prerequisites of this movie (movies that must be watched before this one)
+  prerequisites   MoviePrerequisite[] @relation("MovieToPrerequisites")
+  // Movies for which this movie is a prerequisite
+  prerequisiteFor MoviePrerequisite[] @relation("PrerequisiteToMovies")
+
+  @@index([title])
+}
+
+model MoviePrerequisite {
+  movieId        String
+  prerequisiteId String
+
+  movie          Movie  @relation("MovieToPrerequisites", fields: [movieId], references: [id], onDelete: Cascade)
+  prerequisite   Movie  @relation("PrerequisiteToMovies", fields: [prerequisiteId], references: [id], onDelete: Cascade)
+
+  @@id([movieId, prerequisiteId])
+  @@index([movieId])
+  @@index([prerequisiteId])
+}
+
+model Cinema {
+  id          String         @id @default(uuid())
+  name        String         @unique
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  bundles     CinemaBundle[]
+
+  @@index([name])
+}
+
+model CinemaBundle {
+  id        String   @id @default(uuid())
+  cinemaId  String
+  size      Int
+
+  cinema    Cinema   @relation(fields: [cinemaId], references: [id], onDelete: Cascade)
+
+  @@unique([cinemaId, size])
+  @@index([cinemaId])
+}
+
