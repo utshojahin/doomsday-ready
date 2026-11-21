@@ -8,7 +8,8 @@ import {
   CreateCinemaInput,
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:3000/api';
+const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '');
 
 export class ApiError extends Error {
   constructor(
@@ -22,7 +23,8 @@ export class ApiError extends Error {
 }
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${API_BASE_URL}${cleanEndpoint}`;
   let response: Response;
 
   try {
