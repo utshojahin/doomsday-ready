@@ -4,6 +4,7 @@ import {
   fetchMovies,
   createMovie,
   updateMovie,
+  deleteMovie,
   fetchRewatchOrder,
   fetchCinemas,
   createCinema,
@@ -165,6 +166,23 @@ describe('API Client', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ name: 'Cinema 2', bundleSizes: [3, 6] }),
+      }),
+    );
+  });
+
+  it('deleteMovie calls DELETE /movies/:id', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: async () => null,
+    });
+    global.fetch = fetchMock;
+
+    await deleteMovie('m1');
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/movies/m1'),
+      expect.objectContaining({
+        method: 'DELETE',
       }),
     );
   });

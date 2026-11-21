@@ -12,6 +12,7 @@ describe('MoviesService (Unit)', () => {
       findMany: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
+      delete: jest.Mock;
     };
     moviePrerequisite: {
       findMany: jest.Mock;
@@ -28,6 +29,7 @@ describe('MoviesService (Unit)', () => {
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        delete: jest.fn(),
       },
       moviePrerequisite: {
         findMany: jest.fn(),
@@ -107,6 +109,22 @@ describe('MoviesService (Unit)', () => {
       await expect(
         service.update('m-iron-man', { prerequisiteIds: ['m-endgame'] }),
       ).rejects.toThrow(CircularDependencyException);
+    });
+  });
+
+  describe('remove (DELETE)', () => {
+    it('throws NotFoundException if movie does not exist', async () => {
+      prisma.movie.findUnique.mockResolvedValueOnce(null);
+
+      await expect(service.remove('nonexistent-id')).rejects.toThrow(NotFoundException);
+    });
+
+    it('deletes movie successfully when it exists', async () => {
+      prisma.movie.findUnique.mockResolvedValueOnce({ id: 'm1', title: 'Test Movie' });
+      prisma.movie.delete.mockResolvedValueOnce({ id: 'm1' });
+
+      await expect(service.remove('m1')).resolves.toBeUndefined();
+      expect(prisma.movie.delete).toHaveBeenCalledWith({ where: { id: 'm1' } });
     });
   });
 

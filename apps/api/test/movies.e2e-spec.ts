@@ -344,4 +344,32 @@ describe('Movies API (e2e)', () => {
         .expect(404);
     });
   });
+
+  describe('DELETE /api/movies/:id', () => {
+    it('returns 404 Not Found when deleting a non-existent movie', async () => {
+      await request(app.getHttpServer())
+        .delete('/api/movies/a0000000-0000-4000-8000-000000000000')
+        .expect(404);
+    });
+
+    it('deletes an existing movie and returns 204 No Content', async () => {
+      // Create a temporary movie to delete
+      const tempMovie = await prisma.movie.create({
+        data: {
+          title: `Delete Candidate ${Date.now()}`,
+          releaseYear: 2020,
+          runtimeMinutes: 100,
+          watched: false,
+        },
+      });
+
+      await request(app.getHttpServer())
+        .delete(`/api/movies/${tempMovie.id}`)
+        .expect(204);
+
+      // Verify it no longer exists in database
+      const found = await prisma.movie.findUnique({ where: { id: tempMovie.id } });
+      expect(found).toBeNull();
+    });
+  });
 });

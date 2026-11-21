@@ -442,7 +442,7 @@ export const BookingView: React.FC<BookingViewProps> = ({
                       Mathematical Reason:
                     </span>
                     <p className="text-[11px]">
-                      This venue only offers packages with even capacities ({selectedCinema?.bundleSizes.join(', ')}). Any linear combination of even numbers is always even ($4a + 6b = \text{even}$). Because your party size ({quote.groupSize}) is odd, exact partition is impossible.
+                      This venue only offers packages with even capacities ({selectedCinema?.bundleSizes.join(', ')}). Any linear combination of even package sizes will always be an even total. Because your party size ({quote.groupSize}) is odd, an exact partition is mathematically impossible.
                     </p>
                   </div>
                 )}
