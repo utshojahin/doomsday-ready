@@ -4,8 +4,8 @@ Tick only after you personally review the diff and the test evidence.
 
 - [x] 01 Repository foundation
 - [x] 02 Database schema and seed
-- [ ] 03 Movie create/list
-- [ ] 04 Movie update and cycle guard
+- [x] 03 Movie create/list
+- [x] 04 Movie update and cycle guard
 - [ ] 05 Rewatch plan algorithm/API
 - [ ] 06 Cinema create/list
 - [ ] 07 Booking DP/API
@@ -61,4 +61,39 @@ Tick only after you personally review the diff and the test evidence.
   - Custom PostgreSQL SQL check constraints for runtime, non-self prerequisite, and bundle sizes.
   - NestJS `PrismaModule` & `PrismaService` connection lifecycle management.
   - Idempotent seed script pre-populating all 8 MCU movies with prerequisite graph & 3 challenge cinemas.
+- **Known Gaps**: None.
+
+#### Phase 03: Movie Create & List Endpoints
+- **Status**: Completed & Verified
+- **Tests Run**:
+  - `npm run test`: Passed (14 API unit tests + 19 Web unit tests)
+  - `npm run test:e2e`: Passed (16 total tests across 3 suites)
+  - `npm run build`, `lint`, `typecheck`: All passed with 0 errors
+- **Features Implemented**:
+  - `MoviesModule`, `MoviesController`, and `MoviesService` connected to Prisma/PostgreSQL.
+  - `POST /api/movies` with atomic prerequisite link creation.
+  - `GET /api/movies` returning all titles with formatted prerequisite objects and ID arrays.
+  - Strict input validation via `CreateMovieDto` and global `ValidationPipe`.
+  - Swagger/OpenAPI documentation configured at `/api/docs`.
+- **Known Gaps**: None.
+
+#### Phase 04: Movie Update & Cycle Guard
+- **Status**: Completed & Verified
+- **Tests Run**:
+  - `cycle-detector.spec.ts`: Passed (7 unit tests covering empty graph, linear chain, diamond graph, self-loops, 2-node cycles, multi-node cycles, and disconnected components)
+  - `movies.service.spec.ts`: Passed (unit tests for 404 on missing movie, 409 CIRCULAR_DEPENDENCY on direct and indirect cycles, clearing prerequisites via `[]`, and omitting prerequisites)
+  - `movies.e2e-spec.ts`: Passed (23 tests total across 3 suites)
+    - Scalar updates (title, releaseYear, runtimeMinutes, watched)
+    - Valid prerequisite updates
+    - Omitted prerequisites (retained untouched)
+    - Clearing prerequisites (`prerequisiteIds: []`)
+    - 404 for nonexistent movie UUID
+    - 409 `CIRCULAR_DEPENDENCY` on direct self-dependency
+    - **Assessment Benchmark**: Making *Avengers: Endgame* a prerequisite of *Iron Man* returns HTTP 409 with code `CIRCULAR_DEPENDENCY` and preserves existing database state (atomic rollback)
+  - `npm run build`, `lint`, `typecheck`: All passed with 0 errors
+- **Features Implemented**:
+  - `PATCH /api/movies/:id` supporting partial updates.
+  - Handwritten 3-color DFS cycle detector (`hasCycleInGraph`, `validateNoCycles`) without third-party libraries.
+  - Edge convention documented: $u \to v$ indicates movie $u$ depends on prerequisite $v$.
+  - Atomic database transactions via `prisma.$transaction`.
 - **Known Gaps**: None.
