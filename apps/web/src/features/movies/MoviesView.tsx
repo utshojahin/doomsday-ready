@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Movie, CreateMovieInput, UpdateMovieInput } from '../../types';
 import { formatMinutes } from '../../utils/algorithms';
 import {
@@ -10,6 +10,10 @@ import {
   IconClock,
   IconFilm,
   IconTrash,
+  IconEdit,
+  IconGrid,
+  IconList,
+  IconStar,
 } from '../../components/Icons';
 import { ApiError } from '../../api/client';
 
@@ -24,6 +28,8 @@ interface MoviesViewProps {
   onDeleteMovie?: (id: string) => Promise<void>;
 }
 
+type SortOption = 'year-asc' | 'year-desc' | 'title-asc' | 'runtime-desc';
+
 export const MoviesView: React.FC<MoviesViewProps> = ({
   movies,
   isLoading = false,
@@ -36,6 +42,9 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'watched' | 'unwatched'>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('year-asc');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -50,10 +59,11 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
   const [releaseYear, setReleaseYear] = useState<number>(new Date().getFullYear());
   const [runtimeMinutes, setRuntimeMinutes] = useState<number>(120);
   const [selectedPrereqIds, setSelectedPrereqIds] = useState<string[]>([]);
+  const [prereqSearch, setPrereqSearch] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const movieMap = new Map(movies.map((m) => [m.id, m]));
+  const movieMap = useMemo(() => new Map(movies.map((m) => [m.id, m])), [movies]);
 
   const openAddModal = () => {
     setEditingMovie(null);
@@ -61,6 +71,7 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
     setReleaseYear(2026);
     setRuntimeMinutes(120);
     setSelectedPrereqIds([]);
+    setPrereqSearch('');
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -71,6 +82,7 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
     setReleaseYear(m.releaseYear);
     setRuntimeMinutes(m.runtimeMinutes);
     setSelectedPrereqIds([...m.prerequisiteIds]);
+    setPrereqSearch('');
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -131,8 +143,8 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
       return;
     }
 
-    if (runtimeMinutes < 1 || runtimeMinutes > 300) {
-      setFormError('Runtime must be between 1 and 300 minutes.');
+    if (runtimeMinutes < 1 || runtimeMinutes > 360) {
+      setFormError('Runtime must be between 1 and 360 minutes.');
       return;
     }
 
@@ -165,7 +177,7 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         if (err.code === 'CIRCULAR_DEPENDENCY' || err.status === 409) {
-          setFormError(`Circular dependency detected: ${err.message}. The update was rejected to preserve a valid watch order.`);
+          setFormError(`Circular dependency detected: ${err.message}. The dependency cannot form a loop.`);
         } else {
           setFormError(err.message);
         }
@@ -179,13 +191,23 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
     }
   };
 
-  const filteredMovies = movies.filter((m) => {
-    const matchesSearch = m.title.toLowerCase().includes(search.toLowerCase());
-    if (!matchesSearch) return false;
-    if (filter === 'watched') return m.watched;
-    if (filter === 'unwatched') return !m.watched;
-    return true;
-  });
+  const processedMovies = useMemo(() => {
+    return movies
+      .filter((m) => {
+        const matchesSearch = m.title.toLowerCase().includes(search.toLowerCase());
+        if (!matchesSearch) return false;
+        if (filter === 'watched') return m.watched;
+        if (filter === 'unwatched') return !m.watched;
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'year-asc') return a.releaseYear - b.releaseYear;
+        if (sortBy === 'year-desc') return b.releaseYear - a.releaseYear;
+        if (sortBy === 'title-asc') return a.title.localeCompare(b.title);
+        if (sortBy === 'runtime-desc') return b.runtimeMinutes - a.runtimeMinutes;
+        return 0;
+      });
+  }, [movies, search, filter, sortBy]);
 
   const totalWatched = movies.filter((m) => m.watched).length;
   const totalUnwatchedMinutes = movies
@@ -194,144 +216,216 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
   const totalMinutes = movies.reduce((acc, m) => acc + m.runtimeMinutes, 0);
   const progressPercent = movies.length > 0 ? Math.round((totalWatched / movies.length) * 100) : 0;
 
+  // Filter candidates for prerequisites modal (exclude editingMovie)
+  const candidatePrereqs = useMemo(() => {
+    return movies
+      .filter((m) => (!editingMovie || m.id !== editingMovie.id))
+      .filter((m) => m.title.toLowerCase().includes(prereqSearch.toLowerCase()));
+  }, [movies, editingMovie, prereqSearch]);
+
   return (
     <div className="space-y-6 pb-20 sm:pb-8">
-      {/* Overview Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+      {/* Page Header with Title, Description, and Primary Action */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#262A35] pb-5">
+        <div>
+          <div className="flex items-center space-x-2.5">
+            <h1 className="text-xl sm:text-2xl font-black text-[#FAFAFA] tracking-tight">
+              MCU Movie Catalog
+            </h1>
+            <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-[#E53935]/15 text-[#E53935] border border-[#E53935]/30">
+              {movies.length} TITLES
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-[#A1A1AA] mt-1 max-w-2xl">
+            Explore the Marvel Cinematic Universe, manage prerequisite dependencies, and track your rewatch progress leading to Avengers: Doomsday.
+          </p>
+        </div>
+
+        <button
+          onClick={openAddModal}
+          disabled={isLoading}
+          className="inline-flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-[#E53935] hover:bg-[#D32F2F] text-white text-xs sm:text-sm font-semibold transition-all duration-150 shadow-lg shadow-red-950/40 hover:shadow-red-900/50 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 shrink-0"
+        >
+          <IconPlus className="w-4 h-4 stroke-[2.5]" />
+          <span>Add Movie</span>
+        </button>
+      </div>
+
+      {/* Cinematic Metrics Strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Movies */}
-        <div className="bg-slate-900/80 p-3.5 sm:p-4 rounded-xl border border-slate-800">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-            MCU Catalog
+        <div className="bg-[#15171C] p-4 rounded-2xl border border-[#262A35] shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-[#E53935]/5 rounded-full blur-2xl group-hover:bg-[#E53935]/10 transition-all"></div>
+          <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wider block">
+            Universe Titles
           </span>
-          <div className="mt-1 flex items-baseline space-x-1.5">
-            <span className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+          <div className="mt-2 flex items-baseline space-x-2">
+            <span className="text-2xl sm:text-3xl font-extrabold text-[#FAFAFA] tracking-tight font-mono">
               {movies.length}
             </span>
-            <span className="text-xs text-slate-400">titles</span>
+            <span className="text-xs text-[#A1A1AA]">features</span>
           </div>
-          <p className="mt-1 text-[11px] text-slate-500 truncate">Catalog in release order</p>
+          <div className="mt-2 flex items-center space-x-1.5 text-[11px] text-[#A1A1AA]">
+            <IconFilm className="w-3.5 h-3.5 text-[#E53935]" />
+            <span>Phase 1 through Phase 6</span>
+          </div>
         </div>
 
         {/* Watched Progress */}
-        <div className="bg-slate-900/80 p-3.5 sm:p-4 rounded-xl border border-slate-800">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-            Watched
+        <div className="bg-[#15171C] p-4 rounded-2xl border border-[#262A35] shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-[#F5C518]/5 rounded-full blur-2xl group-hover:bg-[#F5C518]/10 transition-all"></div>
+          <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wider block">
+            Watched Progress
           </span>
-          <div className="mt-1 flex items-baseline space-x-1.5">
-            <span className="text-xl sm:text-2xl font-bold text-emerald-400 tracking-tight">
+          <div className="mt-2 flex items-baseline space-x-2">
+            <span className="text-2xl sm:text-3xl font-extrabold text-[#F5C518] tracking-tight font-mono">
               {totalWatched}
             </span>
-            <span className="text-xs text-slate-400">/ {movies.length}</span>
-            <span className="text-xs text-emerald-500 font-mono">({progressPercent}%)</span>
+            <span className="text-xs text-[#A1A1AA]">/ {movies.length}</span>
+            <span className="text-xs font-mono font-semibold text-[#F5C518]">({progressPercent}%)</span>
           </div>
-          <div className="mt-2 w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800">
+          <div className="mt-2.5 w-full bg-[#09090B] rounded-full h-1.5 overflow-hidden border border-[#262A35]">
             <div
-              className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
+              className="bg-gradient-to-r from-[#E53935] to-[#F5C518] h-1.5 rounded-full transition-all duration-300"
               style={{ width: `${progressPercent}%` }}
             ></div>
           </div>
         </div>
 
-        {/* Unwatched Runtime */}
-        <div className="bg-slate-900/80 p-3.5 sm:p-4 rounded-xl border border-slate-800">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-            Remaining Time
+        {/* Remaining Time */}
+        <div className="bg-[#15171C] p-4 rounded-2xl border border-[#262A35] shadow-sm relative overflow-hidden group">
+          <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wider block">
+            Remaining Watch Time
           </span>
-          <div className="mt-1 flex items-baseline space-x-1.5">
-            <span className="text-xl sm:text-2xl font-bold text-amber-300 tracking-tight font-mono">
+          <div className="mt-2 flex items-baseline space-x-2">
+            <span className="text-2xl sm:text-3xl font-extrabold text-[#FAFAFA] tracking-tight font-mono">
               {formatMinutes(totalUnwatchedMinutes)}
             </span>
           </div>
-          <p className="mt-1 text-[11px] text-slate-500 truncate">
-            {movies.length - totalWatched} unwatched titles
-          </p>
+          <div className="mt-2 flex items-center space-x-1.5 text-[11px] text-[#A1A1AA]">
+            <IconClock className="w-3.5 h-3.5 text-[#F5C518]" />
+            <span>{movies.length - totalWatched} unwatched titles</span>
+          </div>
         </div>
 
-        {/* Total Runtime */}
-        <div className="bg-slate-900/80 p-3.5 sm:p-4 rounded-xl border border-slate-800">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-            Total MCU Time
+        {/* Total MCU Runtime */}
+        <div className="bg-[#15171C] p-4 rounded-2xl border border-[#262A35] shadow-sm relative overflow-hidden group">
+          <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wider block">
+            Total Universe Time
           </span>
-          <div className="mt-1 flex items-baseline space-x-1.5">
-            <span className="text-xl sm:text-2xl font-bold text-slate-200 tracking-tight font-mono">
+          <div className="mt-2 flex items-baseline space-x-2">
+            <span className="text-2xl sm:text-3xl font-extrabold text-[#A1A1AA] tracking-tight font-mono">
               {formatMinutes(totalMinutes)}
             </span>
           </div>
-          <p className="mt-1 text-[11px] text-slate-500 truncate">{totalMinutes} total minutes</p>
+          <div className="mt-2 flex items-center space-x-1.5 text-[11px] text-[#A1A1AA]">
+            <IconStar className="w-3.5 h-3.5 text-[#F5C518]" />
+            <span>{totalMinutes} total screen minutes</span>
+          </div>
         </div>
       </div>
 
-      {/* Action Bar (Search, Filters, Add Movie) */}
-      <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4">
+      {/* Cinematic Controls Bar (Search, Filters, Sort, View Toggle) */}
+      <div className="bg-[#15171C] p-3 sm:p-4 rounded-2xl border border-[#262A35] flex flex-col md:flex-row md:items-center justify-between gap-3">
         {/* Search */}
         <div className="relative flex-1 max-w-md">
-          <IconSearch className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <IconSearch className="w-4 h-4 text-[#A1A1AA] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search movie by title..."
+            placeholder="Search movie by title or keywords..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             disabled={isLoading}
-            className="w-full bg-slate-950 border border-slate-700/80 rounded-lg pl-9 pr-8 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+            className="w-full bg-[#09090B] border border-[#262A35] rounded-xl pl-9 pr-8 py-2 text-xs text-[#FAFAFA] placeholder-[#A1A1AA] focus:outline-none focus:border-[#E53935] transition-colors disabled:opacity-50"
           />
           {search && (
             <button
               onClick={() => setSearch('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A1A1AA] hover:text-[#FAFAFA]"
             >
               <IconX className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
 
-        {/* Filter Pills and Add Button */}
-        <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
-          <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+        {/* Filter Chips, Sort & View Mode */}
+        <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
+          {/* Watched Filter */}
+          <div className="flex items-center bg-[#09090B] p-1 rounded-xl border border-[#262A35] text-xs">
             <button
               onClick={() => setFilter('all')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
+              className={`px-3 py-1 rounded-lg transition-all ${
                 filter === 'all'
-                  ? 'bg-slate-800 text-white font-medium shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#262A35] text-[#FAFAFA] font-semibold shadow-sm'
+                  : 'text-[#A1A1AA] hover:text-[#FAFAFA]'
               }`}
             >
               All ({movies.length})
             </button>
             <button
               onClick={() => setFilter('watched')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
+              className={`px-3 py-1 rounded-lg transition-all ${
                 filter === 'watched'
-                  ? 'bg-emerald-950/70 text-emerald-300 font-medium border border-emerald-800/60'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#F5C518]/20 text-[#F5C518] font-semibold border border-[#F5C518]/30 shadow-sm'
+                  : 'text-[#A1A1AA] hover:text-[#FAFAFA]'
               }`}
             >
               Watched ({totalWatched})
             </button>
             <button
               onClick={() => setFilter('unwatched')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
+              className={`px-3 py-1 rounded-lg transition-all ${
                 filter === 'unwatched'
-                  ? 'bg-amber-950/60 text-amber-300 font-medium border border-amber-800/60'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#E53935]/20 text-[#E53935] font-semibold border border-[#E53935]/30 shadow-sm'
+                  : 'text-[#A1A1AA] hover:text-[#FAFAFA]'
               }`}
             >
               Unwatched ({movies.length - totalWatched})
             </button>
           </div>
 
-          <button
-            onClick={openAddModal}
-            disabled={isLoading}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors shadow-sm disabled:opacity-50"
+          {/* Sort Dropdown */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="bg-[#09090B] border border-[#262A35] rounded-xl px-2.5 py-1.5 text-xs text-[#FAFAFA] focus:outline-none focus:border-[#E53935]"
           >
-            <IconPlus className="w-4 h-4" />
-            <span>Add Movie</span>
-          </button>
+            <option value="year-asc">Chronological (Oldest First)</option>
+            <option value="year-desc">Release Year (Newest First)</option>
+            <option value="title-asc">Title (A to Z)</option>
+            <option value="runtime-desc">Longest Runtime</option>
+          </select>
+
+          {/* View Mode Toggle */}
+          <div className="hidden sm:flex items-center bg-[#09090B] p-1 rounded-xl border border-[#262A35]">
+            <button
+              onClick={() => setViewMode('grid')}
+              title="Cinematic Cards Grid"
+              className={`p-1.5 rounded-lg transition-colors ${
+                viewMode === 'grid'
+                  ? 'bg-[#262A35] text-[#FAFAFA]'
+                  : 'text-[#A1A1AA] hover:text-[#FAFAFA]'
+              }`}
+            >
+              <IconGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              title="Compact Table"
+              className={`p-1.5 rounded-lg transition-colors ${
+                viewMode === 'table'
+                  ? 'bg-[#262A35] text-[#FAFAFA]'
+                  : 'text-[#A1A1AA] hover:text-[#FAFAFA]'
+              }`}
+            >
+              <IconList className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
       {actionError && (
-        <div className="p-3 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center justify-between">
+        <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <IconAlertCircle className="w-4 h-4 shrink-0" />
             <span>{actionError}</span>
@@ -359,191 +453,88 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
         </div>
       )}
 
-      {/* MOBILE CARD VIEW (Visible only on < sm screens) */}
-      <div className="sm:hidden space-y-3">
-        {isLoading && movies.length === 0 ? (
-          <div className="bg-slate-900 p-8 rounded-xl border border-slate-800 text-center text-slate-400 space-y-2">
-            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-xs">Loading MCU titles from database...</p>
-          </div>
-        ) : filteredMovies.map((movie) => (
-          <div
-            key={movie.id}
-            className={`p-4 rounded-xl border transition-all ${
-              movie.watched
-                ? 'bg-slate-900/50 border-slate-800/80'
-                : 'bg-slate-900 border-slate-800'
-            }`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <h3
-                  className={`text-sm font-semibold leading-tight ${
-                    movie.watched ? 'text-slate-400 line-through' : 'text-slate-100'
-                  }`}
-                >
-                  {movie.title}
-                </h3>
-                <div className="flex items-center space-x-2 text-[11px] text-slate-400">
-                  <span className="font-mono">{movie.releaseYear}</span>
-                  <span>·</span>
-                  <span className="flex items-center space-x-1">
-                    <IconClock className="w-3 h-3 text-slate-500 inline" />
-                    <span>{formatMinutes(movie.runtimeMinutes)}</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Watched Action Button */}
-              <button
-                onClick={() => handleToggle(movie.id)}
-                disabled={togglingId === movie.id}
-                className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors shrink-0 ${
-                  movie.watched
-                    ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800/60'
-                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+      {/* CINEMATIC CARDS GRID VIEW */}
+      {viewMode === 'grid' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+          {isLoading && movies.length === 0 ? (
+            <div className="col-span-full bg-[#15171C] p-12 rounded-2xl border border-[#262A35] text-center text-[#A1A1AA] space-y-3">
+              <div className="w-6 h-6 border-2 border-[#E53935] border-t-transparent rounded-full animate-spin mx-auto"></div>
+              <p className="text-xs">Loading MCU catalog from database...</p>
+            </div>
+          ) : processedMovies.map((movie) => {
+            const isWatched = movie.watched;
+            return (
+              <div
+                key={movie.id}
+                className={`group rounded-2xl border transition-all duration-200 flex flex-col justify-between overflow-hidden relative ${
+                  isWatched
+                    ? 'bg-[#15171C]/60 border-[#262A35]/80 hover:border-[#262A35]'
+                    : 'bg-[#15171C] border-[#262A35] hover:border-[#E53935]/50 shadow-sm hover:shadow-lg hover:shadow-black/40'
                 }`}
               >
-                <IconCheck className={`w-3.5 h-3.5 ${movie.watched ? 'text-emerald-400' : 'text-slate-500'}`} />
-                <span>{movie.watched ? 'Watched' : 'Mark Watched'}</span>
-              </button>
-            </div>
+                {/* Top Poster Header */}
+                <div className="p-4 sm:p-5 relative">
+                  {/* Subtle decorative glow for target doomsday */}
+                  {movie.title.includes('Doomsday') && (
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-[#E53935]/15 rounded-full blur-xl pointer-events-none"></div>
+                  )}
 
-            {/* Prerequisites */}
-            <div className="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs gap-2">
-              <div className="flex-1 pr-1">
-                <span className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider block mb-1">
-                  Required Prerequisites:
-                </span>
-                {movie.prerequisiteIds.length === 0 ? (
-                  <span className="text-[11px] text-slate-500 italic">None (Standalone entry)</span>
-                ) : (
-                  <div className="flex flex-wrap gap-1">
-                    {movie.prerequisiteIds.map((pid) => {
-                      const prereq = movieMap.get(pid);
-                      return (
-                        <span
-                          key={pid}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
-                            prereq?.watched
-                              ? 'bg-emerald-950/40 text-emerald-400 border-emerald-900/40'
-                              : 'bg-slate-950 text-slate-300 border-slate-800'
-                          }`}
-                        >
-                          {prereq?.title || pid}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1.5 flex-1 pr-2">
+                      <div className="flex items-center space-x-2 text-[11px]">
+                        <span className="font-mono font-semibold px-2 py-0.5 rounded bg-[#09090B] text-[#A1A1AA] border border-[#262A35]">
+                          {movie.releaseYear}
                         </span>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+                        <span className="flex items-center space-x-1 text-[#A1A1AA]">
+                          <IconClock className="w-3 h-3 text-[#A1A1AA]" />
+                          <span>{formatMinutes(movie.runtimeMinutes)}</span>
+                        </span>
+                      </div>
 
-              <div className="flex items-center space-x-1.5 shrink-0">
-                <button
-                  onClick={() => openEditModal(movie)}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 py-1 px-2 rounded bg-indigo-950/40 border border-indigo-900/40 font-medium"
-                >
-                  Edit
-                </button>
-                {onDeleteMovie && (
-                  <button
-                    onClick={() => setConfirmDeleteMovie(movie)}
-                    className="p-1 rounded bg-rose-950/30 text-rose-400 hover:text-rose-200 border border-rose-900/30"
-                    title="Delete movie"
-                  >
-                    <IconTrash className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-
-        {!isLoading && filteredMovies.length === 0 && (
-          <div className="p-8 text-center text-slate-500 text-xs bg-slate-900 rounded-xl border border-slate-800">
-            {search ? 'No movies match your search query.' : 'No movies in catalog.'}
-          </div>
-        )}
-      </div>
-
-      {/* DESKTOP TABLE VIEW (Visible on sm+ screens) */}
-      <div className="hidden sm:block bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950/70 text-slate-400 border-b border-slate-800 font-medium">
-              <tr>
-                <th className="py-3 px-4 w-12 text-center">Status</th>
-                <th className="py-3 px-4">Title</th>
-                <th className="py-3 px-4 w-24">Year</th>
-                <th className="py-3 px-4 w-28">Runtime</th>
-                <th className="py-3 px-4">Prerequisites</th>
-                <th className="py-3 px-4 w-28 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {isLoading && movies.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-xs">Fetching movies from database...</span>
+                      <h3
+                        className={`text-sm sm:text-base font-bold leading-snug transition-colors ${
+                          isWatched ? 'text-[#A1A1AA] line-through' : 'text-[#FAFAFA]'
+                        }`}
+                      >
+                        {movie.title}
+                      </h3>
                     </div>
-                  </td>
-                </tr>
-              ) : filteredMovies.map((movie) => (
-                <tr
-                  key={movie.id}
-                  className={`hover:bg-slate-800/30 transition-colors ${
-                    movie.watched ? 'bg-slate-900/40' : ''
-                  }`}
-                >
-                  {/* Watched Toggle */}
-                  <td className="py-3 px-4 text-center">
+
+                    {/* Quick Watched Toggle */}
                     <button
                       onClick={() => handleToggle(movie.id)}
                       disabled={togglingId === movie.id}
-                      title={movie.watched ? 'Mark as unwatched' : 'Mark as watched'}
-                      className={`w-5 h-5 rounded flex items-center justify-center transition-colors border ${
-                        movie.watched
-                          ? 'bg-emerald-600 border-emerald-500 text-white'
-                          : 'border-slate-700 bg-slate-950 text-transparent hover:border-slate-500'
+                      title={isWatched ? 'Mark as unwatched' : 'Mark as watched'}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-150 shrink-0 border ${
+                        isWatched
+                          ? 'bg-[#F5C518] border-[#F5C518] text-[#09090B] shadow-sm shadow-[#F5C518]/20'
+                          : 'bg-[#09090B] border-[#262A35] text-transparent hover:text-[#A1A1AA] hover:border-[#E53935]'
                       }`}
                     >
-                      <IconCheck className="w-3.5 h-3.5 stroke-[3]" />
+                      <IconCheck className="w-4 h-4 stroke-[3]" />
                     </button>
-                  </td>
+                  </div>
 
-                  {/* Title */}
-                  <td className="py-3 px-4">
-                    <span className={`font-medium ${movie.watched ? 'text-slate-400 line-through' : 'text-slate-100'}`}>
-                      {movie.title}
+                  {/* Prerequisites List */}
+                  <div className="mt-4 pt-3 border-t border-[#262A35]/70">
+                    <span className="text-[10px] uppercase font-bold text-[#A1A1AA] tracking-wider block mb-1.5">
+                      Required Prerequisites:
                     </span>
-                  </td>
-
-                  {/* Year */}
-                  <td className="py-3 px-4 text-slate-400 font-mono">{movie.releaseYear}</td>
-
-                  {/* Runtime */}
-                  <td className="py-3 px-4 text-slate-400">
-                    <span>{formatMinutes(movie.runtimeMinutes)}</span>
-                    <span className="text-slate-500 text-[10px] ml-1">({movie.runtimeMinutes}m)</span>
-                  </td>
-
-                  {/* Prerequisites */}
-                  <td className="py-3 px-4">
                     {movie.prerequisiteIds.length === 0 ? (
-                      <span className="text-slate-500 italic text-[11px]">None</span>
+                      <span className="text-[11px] text-[#A1A1AA]/70 italic">
+                        None (Root entry)
+                      </span>
                     ) : (
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1">
                         {movie.prerequisiteIds.map((pid) => {
                           const prereq = movieMap.get(pid);
                           return (
                             <span
                               key={pid}
-                              className={`px-2 py-0.5 rounded text-[11px] font-medium border ${
+                              className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
                                 prereq?.watched
-                                  ? 'bg-slate-800/80 text-emerald-400/90 border-slate-700'
-                                  : 'bg-slate-950 text-slate-300 border-slate-800'
+                                  ? 'bg-[#F5C518]/10 text-[#F5C518] border-[#F5C518]/25'
+                                  : 'bg-[#09090B] text-[#A1A1AA] border-[#262A35]'
                               }`}
                             >
                               {prereq?.title || pid}
@@ -552,192 +543,320 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
                         })}
                       </div>
                     )}
-                  </td>
+                  </div>
+                </div>
 
-                  {/* Edit / Delete Buttons */}
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end space-x-1.5">
+                {/* Card Footer Actions */}
+                <div className="px-4 py-3 bg-[#09090B]/60 border-t border-[#262A35] flex items-center justify-between text-xs">
+                  <span className="text-[11px] text-[#A1A1AA]">
+                    {isWatched ? (
+                      <span className="text-[#F5C518] font-medium flex items-center space-x-1">
+                        <IconCheck className="w-3.5 h-3.5" />
+                        <span>Completed</span>
+                      </span>
+                    ) : (
+                      <span className="text-[#A1A1AA]">Pending Rewatch</span>
+                    )}
+                  </span>
+
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      onClick={() => openEditModal(movie)}
+                      className="px-2.5 py-1 rounded-lg text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#262A35] transition-colors font-medium flex items-center space-x-1"
+                    >
+                      <IconEdit className="w-3 h-3" />
+                      <span>Edit</span>
+                    </button>
+                    {onDeleteMovie && (
                       <button
-                        onClick={() => openEditModal(movie)}
-                        className="text-slate-400 hover:text-slate-200 text-xs px-2.5 py-1 rounded hover:bg-slate-800 transition-colors"
+                        onClick={() => setConfirmDeleteMovie(movie)}
+                        title="Delete movie"
+                        className="p-1.5 rounded-lg text-[#A1A1AA] hover:text-[#E53935] hover:bg-rose-950/30 transition-colors"
                       >
-                        Edit
+                        <IconTrash className="w-3.5 h-3.5" />
                       </button>
-                      {onDeleteMovie && (
-                        <button
-                          onClick={() => setConfirmDeleteMovie(movie)}
-                          title="Delete movie"
-                          className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors"
-                        >
-                          <IconTrash className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
 
-              {!isLoading && filteredMovies.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-500 text-xs">
-                    {search ? 'No movies match your search filter.' : 'No movies in catalog. Add your first title!'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          {!isLoading && processedMovies.length === 0 && (
+            <div className="col-span-full p-12 text-center text-[#A1A1AA] text-xs bg-[#15171C] rounded-2xl border border-[#262A35]">
+              {search ? 'No movies match your search query.' : 'No movies in catalog.'}
+            </div>
+          )}
         </div>
-      </div>
+      )}
+
+      {/* COMPACT TABLE VIEW */}
+      {viewMode === 'table' && (
+        <div className="bg-[#15171C] rounded-2xl border border-[#262A35] overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#09090B] text-[#A1A1AA] border-b border-[#262A35] font-semibold">
+                <tr>
+                  <th className="py-3 px-4 w-12 text-center">Watched</th>
+                  <th className="py-3 px-4">Title</th>
+                  <th className="py-3 px-4 w-24">Year</th>
+                  <th className="py-3 px-4 w-28">Runtime</th>
+                  <th className="py-3 px-4">Prerequisites</th>
+                  <th className="py-3 px-4 w-28 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#262A35]/60">
+                {isLoading && movies.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-[#A1A1AA]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <div className="w-5 h-5 border-2 border-[#E53935] border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-xs">Fetching movies from database...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : processedMovies.map((movie) => (
+                  <tr
+                    key={movie.id}
+                    className={`hover:bg-[#1C1F26] transition-colors ${
+                      movie.watched ? 'bg-[#15171C]/50' : ''
+                    }`}
+                  >
+                    {/* Watched Toggle */}
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        onClick={() => handleToggle(movie.id)}
+                        disabled={togglingId === movie.id}
+                        title={movie.watched ? 'Mark as unwatched' : 'Mark as watched'}
+                        className={`w-5 h-5 rounded flex items-center justify-center transition-colors border ${
+                          movie.watched
+                            ? 'bg-[#F5C518] border-[#F5C518] text-[#09090B]'
+                            : 'border-[#262A35] bg-[#09090B] text-transparent hover:border-[#E53935]'
+                        }`}
+                      >
+                        <IconCheck className="w-3.5 h-3.5 stroke-[3]" />
+                      </button>
+                    </td>
+
+                    {/* Title */}
+                    <td className="py-3 px-4">
+                      <span className={`font-semibold ${movie.watched ? 'text-[#A1A1AA] line-through' : 'text-[#FAFAFA]'}`}>
+                        {movie.title}
+                      </span>
+                    </td>
+
+                    {/* Year */}
+                    <td className="py-3 px-4 text-[#A1A1AA] font-mono">{movie.releaseYear}</td>
+
+                    {/* Runtime */}
+                    <td className="py-3 px-4 text-[#A1A1AA]">
+                      <span>{formatMinutes(movie.runtimeMinutes)}</span>
+                    </td>
+
+                    {/* Prerequisites */}
+                    <td className="py-3 px-4">
+                      {movie.prerequisiteIds.length === 0 ? (
+                        <span className="text-[#A1A1AA]/60 italic text-[11px]">None</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {movie.prerequisiteIds.map((pid) => {
+                            const prereq = movieMap.get(pid);
+                            return (
+                              <span
+                                key={pid}
+                                className={`px-2 py-0.5 rounded text-[11px] font-medium border ${
+                                  prereq?.watched
+                                    ? 'bg-[#F5C518]/10 text-[#F5C518] border-[#F5C518]/30'
+                                    : 'bg-[#09090B] text-[#A1A1AA] border-[#262A35]'
+                                }`}
+                              >
+                                {prereq?.title || pid}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end space-x-1.5">
+                        <button
+                          onClick={() => openEditModal(movie)}
+                          className="text-[#A1A1AA] hover:text-[#FAFAFA] text-xs px-2.5 py-1 rounded-lg hover:bg-[#262A35] transition-colors"
+                        >
+                          Edit
+                        </button>
+                        {onDeleteMovie && (
+                          <button
+                            onClick={() => setConfirmDeleteMovie(movie)}
+                            title="Delete movie"
+                            className="p-1 rounded-lg text-[#A1A1AA] hover:text-[#E53935] hover:bg-rose-950/30 transition-colors"
+                          >
+                            <IconTrash className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+
+                {!isLoading && processedMovies.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-[#A1A1AA] text-xs">
+                      {search ? 'No movies match your search filter.' : 'No movies in catalog.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit Movie Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl p-5 sm:p-6 space-y-4 my-8">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#15171C] border border-[#262A35] rounded-2xl max-w-lg w-full shadow-2xl p-5 sm:p-6 space-y-4 my-8">
+            <div className="flex items-center justify-between border-b border-[#262A35] pb-3">
               <div className="flex items-center space-x-2">
-                <IconFilm className="w-4 h-4 text-indigo-400" />
-                <h3 className="text-sm font-bold text-white">
+                <IconFilm className="w-4 h-4 text-[#E53935]" />
+                <h3 className="text-sm sm:text-base font-bold text-[#FAFAFA]">
                   {editingMovie ? `Edit Movie: ${editingMovie.title}` : 'Add New MCU Movie'}
                 </h3>
               </div>
               <button
-                onClick={() => !isSaving && setIsModalOpen(false)}
-                disabled={isSaving}
-                className="text-slate-400 hover:text-white p-1 rounded-md disabled:opacity-40"
+                onClick={() => setIsModalOpen(false)}
+                className="text-[#A1A1AA] hover:text-[#FAFAFA] p-1 rounded-lg hover:bg-[#262A35]"
               >
                 <IconX className="w-4 h-4" />
               </button>
             </div>
 
-            {formError && (
-              <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-start space-x-2">
-                <IconAlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-                <span>{formError}</span>
-              </div>
-            )}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {formError && (
+                <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center space-x-2">
+                  <IconAlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
 
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Movie Title</label>
+              {/* Title Input */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-[#FAFAFA] block">
+                  Movie Title *
+                </label>
                 <input
                   type="text"
                   required
-                  disabled={isSaving}
+                  placeholder="e.g. Spider-Man: Beyond the Spider-Verse"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Black Panther"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                  className="w-full bg-[#09090B] border border-[#262A35] rounded-xl px-3 py-2 text-xs text-[#FAFAFA] placeholder-[#A1A1AA] focus:outline-none focus:border-[#E53935]"
                 />
               </div>
 
+              {/* Year & Runtime */}
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Release Year</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-[#FAFAFA] block">
+                    Release Year *
+                  </label>
                   <input
                     type="number"
-                    min="1900"
-                    max="2100"
                     required
-                    disabled={isSaving}
+                    min={1900}
+                    max={2100}
                     value={releaseYear}
-                    onChange={(e) => setReleaseYear(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500 font-mono disabled:opacity-50"
+                    onChange={(e) => setReleaseYear(parseInt(e.target.value) || 2026)}
+                    className="w-full bg-[#09090B] border border-[#262A35] rounded-xl px-3 py-2 text-xs text-[#FAFAFA] focus:outline-none focus:border-[#E53935]"
                   />
                 </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Runtime (minutes)</label>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-[#FAFAFA] block">
+                    Runtime (minutes) *
+                  </label>
                   <input
                     type="number"
-                    min="1"
-                    max="300"
                     required
-                    disabled={isSaving}
+                    min={1}
+                    max={360}
                     value={runtimeMinutes}
-                    onChange={(e) => setRuntimeMinutes(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500 font-mono disabled:opacity-50"
+                    onChange={(e) => setRuntimeMinutes(parseInt(e.target.value) || 120)}
+                    className="w-full bg-[#09090B] border border-[#262A35] rounded-xl px-3 py-2 text-xs text-[#FAFAFA] focus:outline-none focus:border-[#E53935]"
                   />
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-slate-300 font-medium">
-                    Required Prerequisites (Direct Dependencies)
+              {/* Prerequisite Selection */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-[#FAFAFA]">
+                    Prerequisites ({selectedPrereqIds.length} selected)
                   </label>
-                  <span className="text-[11px] text-indigo-400 font-mono">
-                    {selectedPrereqIds.length} selected
+                  <span className="text-[10px] text-[#A1A1AA]">
+                    Must watch before this movie
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 mb-2">
-                  Select titles that must be watched prior to this movie. Circular dependencies will be rejected atomically.
-                </p>
-                <div className="max-h-48 overflow-y-auto space-y-1 border border-slate-800 bg-slate-950/80 p-2.5 rounded-xl divide-y divide-slate-800/40">
-                  {movies
-                    .filter((m) => m.id !== editingMovie?.id)
-                    .map((candidate) => {
-                      const isChecked = selectedPrereqIds.includes(candidate.id);
+
+                <div className="relative">
+                  <IconSearch className="w-3.5 h-3.5 text-[#A1A1AA] absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search candidate prerequisites..."
+                    value={prereqSearch}
+                    onChange={(e) => setPrereqSearch(e.target.value)}
+                    className="w-full bg-[#09090B] border border-[#262A35] rounded-xl pl-8 pr-3 py-1.5 text-xs text-[#FAFAFA] placeholder-[#A1A1AA] focus:outline-none focus:border-[#E53935]"
+                  />
+                </div>
+
+                <div className="max-h-44 overflow-y-auto bg-[#09090B] border border-[#262A35] rounded-xl p-2 space-y-1">
+                  {candidatePrereqs.length === 0 ? (
+                    <p className="text-[11px] text-[#A1A1AA] text-center py-2">
+                      No movies found matching search.
+                    </p>
+                  ) : (
+                    candidatePrereqs.map((candidate) => {
+                      const isSelected = selectedPrereqIds.includes(candidate.id);
                       return (
-                        <label
+                        <button
                           key={candidate.id}
-                          className="flex items-center space-x-2.5 py-1.5 first:pt-0 cursor-pointer hover:text-white"
+                          type="button"
+                          onClick={() => handlePrereqToggle(candidate.id)}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition-colors ${
+                            isSelected
+                              ? 'bg-[#E53935]/20 text-[#FAFAFA] border border-[#E53935]/40 font-medium'
+                              : 'text-[#A1A1AA] hover:bg-[#15171C] hover:text-[#FAFAFA]'
+                          }`}
                         >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            disabled={isSaving}
-                            onChange={() => handlePrereqToggle(candidate.id)}
-                            className="rounded border-slate-700 text-indigo-600 focus:ring-0 bg-slate-900 w-4 h-4 disabled:opacity-50"
-                          />
-                          <span className="text-slate-300 text-xs">{candidate.title}</span>
-                          <span className="text-slate-500 text-[10px] font-mono">
+                          <span className="truncate pr-2">{candidate.title}</span>
+                          <span className="text-[10px] font-mono shrink-0 text-[#A1A1AA]">
                             ({candidate.releaseYear})
                           </span>
-                        </label>
+                        </button>
                       );
-                    })}
-                  {movies.length <= 1 && (
-                    <p className="text-slate-500 text-[11px] italic py-2 text-center">
-                      No other movies in catalog to select as prerequisites.
-                    </p>
+                    })
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-slate-800">
-                {editingMovie && onDeleteMovie ? (
-                  <button
-                    type="button"
-                    disabled={isSaving}
-                    onClick={() => setConfirmDeleteMovie(editingMovie)}
-                    className="flex items-center space-x-1.5 text-xs text-rose-400 hover:text-rose-300 px-2 py-1.5 rounded hover:bg-rose-950/30 transition-colors"
-                  >
-                    <IconTrash className="w-3.5 h-3.5" />
-                    <span>Delete Movie</span>
-                  </button>
-                ) : (
-                  <div></div>
-                )}
-
-                <div className="flex space-x-2">
-                  <button
-                    type="button"
-                    disabled={isSaving}
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition-colors disabled:opacity-40"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-colors disabled:opacity-50 flex items-center space-x-1.5"
-                  >
-                    {isSaving && (
-                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    )}
-                    <span>{isSaving ? 'Saving...' : editingMovie ? 'Save Changes' : 'Create Movie'}</span>
-                  </button>
-                </div>
+              {/* Submit Buttons */}
+              <div className="pt-2 flex items-center justify-end space-x-2 border-t border-[#262A35]">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#262A35] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#E53935] hover:bg-[#D32F2F] text-white transition-colors shadow-sm disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : editingMovie ? 'Update Movie' : 'Save Movie'}
+                </button>
               </div>
             </form>
           </div>
@@ -747,35 +866,34 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
       {/* Delete Confirmation Modal */}
       {confirmDeleteMovie && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full shadow-2xl p-5 space-y-4">
-            <div className="flex items-center space-x-2.5 text-rose-400">
-              <IconAlertCircle className="w-5 h-5 shrink-0" />
-              <h3 className="text-sm font-bold text-white">Delete Movie</h3>
+          <div className="bg-[#15171C] border border-[#262A35] rounded-2xl max-w-sm w-full shadow-2xl p-5 space-y-4">
+            <div className="w-10 h-10 rounded-xl bg-rose-950/60 border border-rose-800 text-[#E53935] flex items-center justify-center mx-auto">
+              <IconTrash className="w-5 h-5" />
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Are you sure you want to delete <strong className="text-white">"{confirmDeleteMovie.title}"</strong>? This will permanently remove the movie and its prerequisite links from the database.
-            </p>
+            <div className="text-center space-y-1">
+              <h3 className="text-sm font-bold text-[#FAFAFA]">Delete Movie?</h3>
+              <p className="text-xs text-[#A1A1AA] leading-relaxed">
+                Are you sure you want to delete <strong className="text-[#FAFAFA] font-semibold">{confirmDeleteMovie.title}</strong>? Prerequisite associations with this movie will be cleanly removed.
+              </p>
+            </div>
 
-            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-end space-x-2 pt-2">
               <button
                 type="button"
-                disabled={isDeleting}
                 onClick={() => setConfirmDeleteMovie(null)}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-medium"
+                disabled={isDeleting}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#262A35] transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={isDeleting}
                 onClick={() => handleDelete(confirmDeleteMovie)}
-                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center space-x-1.5 disabled:opacity-50"
+                disabled={isDeleting}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold bg-[#E53935] hover:bg-[#D32F2F] text-white transition-colors shadow-sm disabled:opacity-50"
               >
-                {isDeleting && (
-                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                )}
-                <span>{isDeleting ? 'Deleting...' : 'Confirm Delete'}</span>
+                {isDeleting ? 'Deleting...' : 'Confirm Delete'}
               </button>
             </div>
           </div>

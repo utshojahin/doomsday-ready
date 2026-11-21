@@ -62,30 +62,30 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, moviesC
   return (
     <>
       {/* Top Header */}
-      <header className="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40">
+      <header className="border-b border-[#262A35] bg-[#09090B]/90 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           {/* Brand Logo & Title */}
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-600 via-red-600 to-amber-500 flex items-center justify-center font-black text-white text-sm shadow-md shadow-red-950/30 tracking-tight select-none">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#B71C1C] via-[#E53935] to-[#F5C518] flex items-center justify-center font-black text-white text-sm shadow-md shadow-red-950/40 tracking-tight select-none">
               DR
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-extrabold text-white tracking-tight text-sm sm:text-base">
+                <span className="font-extrabold text-[#FAFAFA] tracking-tight text-sm sm:text-base">
                   DOOMSDAY READY
                 </span>
-                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-950/40 text-red-400 border border-red-900/40">
+                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#E53935]/15 text-[#E53935] border border-[#E53935]/30">
                   MCU 2026
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
+              <p className="text-[11px] text-[#A1A1AA] font-medium hidden sm:block">
                 Prerequisite Sequence & Opening Night Ticket Optimizer
               </p>
             </div>
           </div>
 
           {/* Desktop/Tablet Segmented Navigation */}
-          <nav className="hidden sm:flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs font-medium shadow-inner">
+          <nav className="hidden sm:flex items-center bg-[#15171C] p-1 rounded-xl border border-[#262A35] text-xs font-medium shadow-inner">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -95,18 +95,18 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, moviesC
                   onClick={() => setActiveTab(item.id)}
                   className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg transition-all duration-150 ${
                     isActive
-                      ? 'bg-slate-800 text-white shadow-sm font-semibold'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                      ? 'bg-[#262A35] text-[#FAFAFA] shadow-sm font-semibold'
+                      : 'text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#1C1F26]'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-[#E53935]' : 'text-[#A1A1AA]'}`} />
                   <span>{item.label}</span>
                   {item.badge !== undefined && (
                     <span
                       className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
                         isActive
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-800 text-slate-400 border border-slate-700'
+                          ? 'bg-[#E53935] text-white'
+                          : 'bg-[#262A35] text-[#A1A1AA]'
                       }`}
                     >
                       {item.badge}
@@ -135,7 +135,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, moviesC
                 <span>Connecting...</span>
               </div>
             ) : (
-              <div className="flex items-center space-x-1.5 text-slate-500 text-[11px]">
+              <div className="flex items-center space-x-1.5 text-[#A1A1AA] text-[11px]">
                 <span className="w-2 h-2 rounded-full bg-slate-600 animate-pulse"></span>
                 <span className="hidden sm:inline">Connecting...</span>
               </div>
@@ -147,7 +147,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, moviesC
       {/* Floating Mobile Bottom Navigation Bar (Visible only on < sm screens) */}
       <nav
         aria-label="Mobile Navigation"
-        className="sm:hidden fixed bottom-3 left-3 right-3 z-50 bg-slate-900/95 backdrop-blur-lg border border-slate-800/90 rounded-2xl shadow-2xl p-1.5 flex items-center justify-around"
+        className="sm:hidden fixed bottom-3 left-3 right-3 z-50 bg-[#15171C]/95 backdrop-blur-lg border border-[#262A35] rounded-2xl shadow-2xl p-1.5 flex items-center justify-around"
       >
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -158,14 +158,14 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, moviesC
               onClick={() => setActiveTab(item.id)}
               className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all ${
                 isActive
-                  ? 'bg-slate-800 text-white font-semibold'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#262A35] text-[#FAFAFA] font-semibold'
+                  : 'text-[#A1A1AA] hover:text-[#FAFAFA]'
               }`}
             >
               <div className="relative">
-                <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
+                <Icon className={`w-5 h-5 ${isActive ? 'text-[#E53935]' : 'text-[#A1A1AA]'}`} />
                 {item.badge !== undefined && (
-                  <span className="absolute -top-1.5 -right-2.5 text-[9px] bg-indigo-600 text-white font-mono px-1 rounded-full">
+                  <span className="absolute -top-1.5 -right-2.5 text-[9px] bg-[#E53935] text-white font-mono px-1 rounded-full">
                     {item.badge}
                   </span>
                 )}

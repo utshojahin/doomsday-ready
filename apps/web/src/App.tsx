@@ -74,7 +74,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-[#09090B] text-[#FAFAFA] flex flex-col font-sans selection:bg-[#E53935] selection:text-white">
       {/* Sleek Top Navigation */}
       <Navbar
         activeTab={activeTab}
@@ -83,7 +83,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-3.5 sm:px-4 py-5 sm:py-8">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-3.5 sm:px-6 py-6 sm:py-8">
         {activeTab === 'movies' && (
           <MoviesView
             movies={movies}
@@ -114,10 +114,14 @@ export const App: React.FC = () => {
       </main>
 
       {/* Footer (with extra bottom spacing on mobile for navigation bar) */}
-      <footer className="border-t border-slate-900 bg-slate-950/90 py-6 mb-16 sm:mb-0 text-center text-xs text-slate-500">
+      <footer className="border-t border-[#262A35] bg-[#09090B] py-6 mb-16 sm:mb-0 text-center text-xs text-[#A1A1AA]">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Doomsday Ready — MCU Rewatch & Opening Night Ticket Optimizer</span>
-          <span className="font-mono text-[11px] text-slate-600">
+          <div className="flex items-center space-x-2">
+            <span className="font-bold text-[#FAFAFA]">DOOMSDAY READY</span>
+            <span>—</span>
+            <span>MCU Rewatch & Opening Night Ticket Optimizer</span>
+          </div>
+          <span className="font-mono text-[11px] text-[#A1A1AA]/70">
             Handwritten Graph DFS & Unbounded Knapsack DP · Strict TypeScript · Tailwind CSS
           </span>
         </div>

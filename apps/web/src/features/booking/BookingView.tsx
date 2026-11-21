@@ -194,41 +194,43 @@ export const BookingView: React.FC<BookingViewProps> = ({
   const isOddGroupSize = groupSize % 2 !== 0;
 
   return (
-    <div className="space-y-6 pb-20 sm:pb-8 pt-2">
-      {/* Header Banner */}
-      <div className="bg-slate-900/90 p-4 sm:p-5 rounded-2xl border border-slate-800 shadow-sm space-y-2">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center space-x-2">
-              <IconTicket className="w-4 h-4 text-indigo-400" />
-              <h2 className="text-base font-bold text-white">Opening Night Ticket Bundle Optimizer</h2>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Opening night ticket packages are sold strictly in fixed seat bundles. This unbounded dynamic programming optimizer computes the exact minimum number of packages needed for your party with zero wasted seats.
-            </p>
+    <div className="space-y-6 pb-20 sm:pb-8">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#262A35] pb-5">
+        <div>
+          <div className="flex items-center space-x-2.5">
+            <h1 className="text-xl sm:text-2xl font-black text-[#FAFAFA] tracking-tight">
+              Opening Night Ticket Bundle Optimizer
+            </h1>
+            <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-[#E53935]/15 text-[#E53935] border border-[#E53935]/30">
+              KNAPSACK DP
+            </span>
           </div>
-
-          <button
-            onClick={() => {
-              setModalError(null);
-              setIsModalOpen(true);
-            }}
-            disabled={isCinemasLoading}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors shadow-sm self-start sm:self-auto shrink-0 disabled:opacity-50"
-          >
-            <IconPlus className="w-4 h-4" />
-            <span>New Cinema</span>
-          </button>
+          <p className="text-xs sm:text-sm text-[#A1A1AA] mt-1 max-w-2xl">
+            Ticket packages are sold in fixed seat bundles. This unbounded dynamic programming optimizer computes the exact minimal package purchase with zero wasted seats.
+          </p>
         </div>
+
+        <button
+          onClick={() => {
+            setModalError(null);
+            setIsModalOpen(true);
+          }}
+          disabled={isCinemasLoading}
+          className="inline-flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-[#E53935] hover:bg-[#D32F2F] text-white text-xs sm:text-sm font-semibold transition-all duration-150 shadow-lg shadow-red-950/40 hover:shadow-red-900/50 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 shrink-0"
+        >
+          <IconPlus className="w-4 h-4 stroke-[2.5]" />
+          <span>New Cinema</span>
+        </button>
       </div>
 
       {/* Assessment Benchmark 1-Click Cards */}
       <div className="space-y-2">
-        <div className="flex items-center space-x-2 text-xs font-semibold text-slate-300">
-          <IconSparkles className="w-3.5 h-3.5 text-amber-400" />
+        <div className="flex items-center space-x-2 text-xs font-semibold text-[#FAFAFA]">
+          <IconSparkles className="w-3.5 h-3.5 text-[#F5C518]" />
           <span>Official Assessment Benchmarks (1-Click Test Scenarios)</span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
           {assessmentBenchmarks.map((bench, idx) => (
             <button
               key={idx}
@@ -238,36 +240,36 @@ export const BookingView: React.FC<BookingViewProps> = ({
                   setGroupSize(bench.seats);
                 }
               }}
-              className="text-left p-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 transition-all space-y-1.5 group"
+              className="text-left p-3.5 rounded-2xl bg-[#15171C] hover:bg-[#1C1F26] border border-[#262A35] hover:border-[#E53935]/50 transition-all space-y-1.5 group shadow-sm"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-indigo-400 group-hover:text-indigo-300">
+                <span className="text-[11px] font-bold text-[#E53935] group-hover:text-[#F5C518] transition-colors">
                   {bench.title}
                 </span>
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-[#09090B] text-[#FAFAFA] border border-[#262A35]">
                   {bench.seats} Seats
                 </span>
               </div>
-              <div className="text-xs text-slate-200 font-medium truncate">{bench.venue}</div>
-              <div className="text-[11px] text-slate-400 font-mono">Bundles: {bench.bundles}</div>
-              <p className="text-[10px] text-emerald-400/90 font-medium pt-0.5">{bench.expected}</p>
+              <div className="text-xs text-[#FAFAFA] font-bold truncate">{bench.venue}</div>
+              <div className="text-[11px] text-[#A1A1AA] font-mono">Bundles: {bench.bundles}</div>
+              <p className="text-[10px] text-[#F5C518] font-semibold pt-0.5">{bench.expected}</p>
             </button>
           ))}
         </div>
       </div>
 
       {/* Booking Parameters Form */}
-      <div className="bg-slate-900/90 p-4 sm:p-5 rounded-2xl border border-slate-800 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+      <div className="bg-[#15171C] p-4 sm:p-5 rounded-2xl border border-[#262A35] shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* Cinema Selection */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-slate-300">
+          <label className="block text-xs font-semibold text-[#FAFAFA]">
             Select Cinema Venue
           </label>
           <select
             value={selectedCinemaId}
             onChange={(e) => setSelectedCinemaId(e.target.value)}
             disabled={isCinemasLoading || cinemas.length === 0}
-            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 font-medium focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+            className="w-full bg-[#09090B] border border-[#262A35] rounded-xl px-3.5 py-2.5 text-xs text-[#FAFAFA] font-semibold focus:outline-none focus:border-[#E53935] disabled:opacity-50"
           >
             {cinemas.map((c) => (
               <option key={c.id} value={c.id}>
@@ -276,13 +278,13 @@ export const BookingView: React.FC<BookingViewProps> = ({
             ))}
           </select>
           {selectedCinema && (
-            <div className="flex items-center space-x-1.5 text-[11px] text-slate-400 pt-1">
+            <div className="flex items-center space-x-1.5 text-[11px] text-[#A1A1AA] pt-1">
               <span>Available seat packages:</span>
               <div className="flex gap-1 flex-wrap">
                 {selectedCinema.bundleSizes.map((size) => (
                   <span
                     key={size}
-                    className="px-2 py-0.5 rounded-md bg-slate-950 font-mono text-slate-300 border border-slate-800 text-[11px]"
+                    className="px-2 py-0.5 rounded-lg bg-[#09090B] font-mono font-semibold text-[#F5C518] border border-[#262A35] text-[11px]"
                   >
                     {size} seats
                   </span>
@@ -294,7 +296,7 @@ export const BookingView: React.FC<BookingViewProps> = ({
 
         {/* Group Size Input */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-slate-300">
+          <label className="block text-xs font-semibold text-[#FAFAFA]">
             Group Size (Exact Party Attendees)
           </label>
           <div className="flex items-center space-x-2">
@@ -304,41 +306,44 @@ export const BookingView: React.FC<BookingViewProps> = ({
               max="10000"
               value={groupSize || ''}
               onChange={(e) => setGroupSize(Number(e.target.value))}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 font-mono font-medium focus:outline-none focus:border-indigo-500"
+              className="w-full bg-[#09090B] border border-[#262A35] rounded-xl px-3.5 py-2.5 text-xs text-[#FAFAFA] font-mono font-bold focus:outline-none focus:border-[#E53935]"
               placeholder="e.g. 11"
             />
             <button
               onClick={() => loadQuote(selectedCinemaId, groupSize)}
               disabled={isQuoteLoading}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold shrink-0 transition-colors border border-slate-700"
+              className="px-4 py-2.5 rounded-xl bg-[#E53935] hover:bg-[#D32F2F] text-white text-xs font-semibold shrink-0 transition-colors shadow-sm disabled:opacity-50"
             >
-              {isQuoteLoading ? 'Solving...' : 'Recalculate'}
+              {isQuoteLoading ? 'Solving...' : 'Calculate Booking'}
             </button>
           </div>
-          <p className="text-[11px] text-slate-500">
-            Enter exact party size from 1 to 10,000 seats.
+          <p className="text-[11px] text-[#A1A1AA]">
+            Enter exact party size from 1 to 10,000 attendees.
           </p>
         </div>
       </div>
 
       {quoteError && (
-        <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800 text-rose-300 text-xs flex items-center space-x-2">
+        <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-800 text-rose-300 text-xs flex items-center space-x-2">
           <IconAlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
           <span>{quoteError}</span>
         </div>
       )}
 
-      {/* Quote Results Display */}
+      {/* Quote Results Display (Cinema Admission Ticket Aesthetic) */}
       {quote && (
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
-          <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <IconTicket className="w-4 h-4 text-indigo-400" />
-              <h3 className="text-xs sm:text-sm font-bold text-white">
+        <div className="bg-[#15171C] rounded-2xl border border-[#262A35] overflow-hidden shadow-lg relative">
+          {/* Ticket Header */}
+          <div className="p-4 sm:p-5 border-b border-[#262A35] bg-[#09090B]/60 flex items-center justify-between">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-7 h-7 rounded-lg bg-[#E53935]/20 text-[#E53935] border border-[#E53935]/30 flex items-center justify-center">
+                <IconTicket className="w-4 h-4" />
+              </div>
+              <h3 className="text-xs sm:text-sm font-bold text-[#FAFAFA]">
                 Ticket Allocation Result · {selectedCinema?.name}
               </h3>
             </div>
-            <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+            <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-[#262A35] text-[#FAFAFA] border border-[#262A35]">
               Target: {quote.groupSize} Seats
             </span>
           </div>
@@ -347,98 +352,98 @@ export const BookingView: React.FC<BookingViewProps> = ({
             <div className="p-5 sm:p-6 space-y-6">
               {/* Quote Metrics */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                <div className="bg-[#09090B] p-4 rounded-2xl border border-[#262A35]">
+                  <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wider block">
                     Total Packages Needed
                   </span>
-                  <div className="mt-1 flex items-baseline space-x-2">
-                    <span className="text-3xl font-extrabold text-emerald-400 tracking-tight font-mono">
+                  <div className="mt-2 flex items-baseline space-x-2">
+                    <span className="text-3xl font-extrabold text-[#F5C518] tracking-tight font-mono">
                       {quote.totalBundles}
                     </span>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-[#A1A1AA]">
                       {quote.totalBundles === 1 ? 'bundle' : 'bundles'}
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] text-slate-500">Minimum possible count via DP</p>
+                  <p className="mt-1.5 text-[11px] text-[#A1A1AA]">Minimum possible count via DP</p>
                 </div>
 
-                <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    Seats Covered
+                <div className="bg-[#09090B] p-4 rounded-2xl border border-[#262A35]">
+                  <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wider block">
+                    Total Seats Covered
                   </span>
-                  <div className="mt-1 flex items-baseline space-x-2">
-                    <span className="text-3xl font-extrabold text-white tracking-tight font-mono">
+                  <div className="mt-2 flex items-baseline space-x-2">
+                    <span className="text-3xl font-extrabold text-[#FAFAFA] tracking-tight font-mono">
                       {quote.bundles.reduce((acc, b) => acc + b.size * b.count, 0)}
                     </span>
-                    <span className="text-xs text-slate-400">exact seats</span>
+                    <span className="text-xs text-[#A1A1AA]">exact seats</span>
                   </div>
-                  <p className="mt-1 text-[11px] text-emerald-400/90 font-medium flex items-center space-x-1">
-                    <IconCheck className="w-3 h-3 inline" />
+                  <p className="mt-1.5 text-[11px] text-emerald-400 font-medium flex items-center space-x-1">
+                    <IconCheck className="w-3.5 h-3.5 inline" />
                     <span>Exact zero wasted seats</span>
                   </p>
                 </div>
 
-                <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    DP Optimality Proof
+                <div className="bg-[#09090B] p-4 rounded-2xl border border-[#262A35]">
+                  <span className="text-[11px] font-semibold text-[#A1A1AA] uppercase tracking-wider block">
+                    DP Optimality Guarantee
                   </span>
-                  <p className="mt-1 text-xs text-slate-300 leading-relaxed">
-                    Unbounded knapsack dynamic programming evaluates all combinations to guarantee minimal bundle transactions.
+                  <p className="mt-2 text-xs text-[#A1A1AA] leading-relaxed">
+                    Unbounded knapsack dynamic programming evaluates all candidate combinations to guarantee minimal bundle transactions.
                   </p>
                 </div>
               </div>
 
               {/* Recommended Bundle Breakdown */}
               <div>
-                <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-3">
+                <h4 className="text-xs font-bold text-[#FAFAFA] uppercase tracking-wider mb-3">
                   Optimal Bundle Allocation Breakdown
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {quote.bundles.map((b) => (
                     <div
                       key={b.size}
-                      className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between"
+                      className="bg-[#09090B] border border-[#262A35] hover:border-[#F5C518]/40 rounded-2xl p-4 flex items-center justify-between transition-colors"
                     >
                       <div>
-                        <span className="text-[11px] text-slate-400 font-medium">Package Size</span>
-                        <div className="text-sm font-bold text-white font-mono">{b.size} seats</div>
-                        <span className="text-[10px] text-slate-500 font-mono">
+                        <span className="text-[11px] text-[#A1A1AA] font-semibold">Package Size</span>
+                        <div className="text-base font-bold text-[#FAFAFA] font-mono">{b.size} seats</div>
+                        <span className="text-[10px] text-[#A1A1AA] font-mono">
                           ({b.size * b.count} total seats)
                         </span>
                       </div>
                       <div className="text-right">
-                        <span className="text-[11px] text-slate-400 font-medium">Quantity</span>
-                        <div className="text-base font-extrabold text-indigo-400 font-mono">× {b.count}</div>
+                        <span className="text-[11px] text-[#A1A1AA] font-semibold">Quantity</span>
+                        <div className="text-lg font-black text-[#F5C518] font-mono">× {b.count}</div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="text-[11px] text-slate-500 italic border-t border-slate-800/60 pt-3">
+              <div className="text-[11px] text-[#A1A1AA] italic border-t border-[#262A35] pt-3">
                 * Note: This calculation provides the mathematically minimal ticket package allocation. No tickets or seats have been purchased.
               </div>
             </div>
           ) : (
             <div className="p-6 sm:p-8 space-y-4">
-              <div className="bg-slate-950/80 p-4 sm:p-5 rounded-xl border border-amber-900/40 space-y-3">
+              <div className="bg-[#09090B] p-5 rounded-2xl border border-amber-900/40 space-y-3">
                 <div className="flex items-center space-x-2 text-amber-400">
                   <IconAlertCircle className="w-5 h-5 shrink-0" />
-                  <h4 className="text-sm font-bold text-slate-100">
+                  <h4 className="text-sm font-bold text-[#FAFAFA]">
                     Exact Seating Partition Not Possible
                   </h4>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/60 ml-auto">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/60 ml-auto font-bold">
                     Not Possible
                   </span>
                 </div>
 
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  No combination of available packages (<span className="font-mono text-white">{selectedCinema?.bundleSizes.join(', ')} seats</span>) can sum to exactly <strong className="text-white">{quote.groupSize} seats</strong> without leaving empty seats.
+                <p className="text-xs text-[#A1A1AA] leading-relaxed">
+                  No combination of available packages (<span className="font-mono text-[#FAFAFA]">{selectedCinema?.bundleSizes.join(', ')} seats</span>) can sum to exactly <strong className="text-[#FAFAFA]">{quote.groupSize} seats</strong> without leaving empty seats.
                 </p>
 
                 {allBundlesEven && isOddGroupSize && (
-                  <div className="text-xs text-slate-400 bg-slate-900/90 p-3 rounded-lg border border-slate-800 space-y-1">
-                    <span className="text-[11px] font-semibold text-slate-300 block">
+                  <div className="text-xs text-[#A1A1AA] bg-[#15171C] p-3.5 rounded-xl border border-[#262A35] space-y-1">
+                    <span className="text-[11px] font-bold text-[#FAFAFA] block">
                       Mathematical Reason:
                     </span>
                     <p className="text-[11px]">
@@ -448,11 +453,11 @@ export const BookingView: React.FC<BookingViewProps> = ({
                 )}
 
                 <div className="pt-2 flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-slate-400">Suggestions:</span>
+                  <span className="text-xs text-[#A1A1AA] font-semibold">Suggestions:</span>
                   {allBundlesEven && isOddGroupSize && (
                     <button
                       onClick={() => setGroupSize(quote.groupSize + 1)}
-                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors"
+                      className="px-3 py-1.5 rounded-xl bg-[#262A35] hover:bg-[#1C1F26] text-[#FAFAFA] text-xs font-semibold border border-[#262A35] transition-colors"
                     >
                       Try {quote.groupSize + 1} seats (Even)
                     </button>
@@ -460,7 +465,7 @@ export const BookingView: React.FC<BookingViewProps> = ({
                   {starkCinema && selectedCinemaId !== starkCinema.id && (
                     <button
                       onClick={() => setSelectedCinemaId(starkCinema.id)}
-                      className="px-2.5 py-1 rounded-lg bg-indigo-950/70 hover:bg-indigo-900/70 text-indigo-300 text-xs font-medium border border-indigo-800/60 transition-colors"
+                      className="px-3 py-1.5 rounded-xl bg-[#E53935]/20 hover:bg-[#E53935]/30 text-[#FAFAFA] text-xs font-semibold border border-[#E53935]/40 transition-colors"
                     >
                       Switch to Stark IMAX (offers 5-seat packages)
                     </button>
@@ -474,14 +479,14 @@ export const BookingView: React.FC<BookingViewProps> = ({
 
       {/* Add Cinema Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl p-5 sm:p-6 space-y-4 my-8">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white">Add New Cinema Venue</h3>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#15171C] border border-[#262A35] rounded-2xl max-w-md w-full shadow-2xl p-5 sm:p-6 space-y-4 my-8">
+            <div className="flex items-center justify-between border-b border-[#262A35] pb-3">
+              <h3 className="text-sm sm:text-base font-bold text-[#FAFAFA]">Add New Cinema Venue</h3>
               <button
                 onClick={() => !isCreatingCinema && setIsModalOpen(false)}
                 disabled={isCreatingCinema}
-                className="text-slate-400 hover:text-white p-1 rounded-md disabled:opacity-40"
+                className="text-[#A1A1AA] hover:text-[#FAFAFA] p-1 rounded-lg hover:bg-[#262A35] disabled:opacity-40"
               >
                 <IconX className="w-4 h-4" />
               </button>
@@ -495,8 +500,8 @@ export const BookingView: React.FC<BookingViewProps> = ({
             )}
 
             <form onSubmit={handleAddCinemaSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Cinema Venue Name</label>
+              <div className="space-y-1">
+                <label className="block text-[#FAFAFA] font-semibold">Cinema Venue Name *</label>
                 <input
                   type="text"
                   required
@@ -504,13 +509,13 @@ export const BookingView: React.FC<BookingViewProps> = ({
                   value={newCinemaName}
                   onChange={(e) => setNewCinemaName(e.target.value)}
                   placeholder="e.g. Stark IMAX Theatre"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                  className="w-full bg-[#09090B] border border-[#262A35] rounded-xl px-3.5 py-2 text-xs text-[#FAFAFA] focus:outline-none focus:border-[#E53935] disabled:opacity-50"
                 />
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">
-                  Bundle Sizes (Comma-Separated)
+              <div className="space-y-1">
+                <label className="block text-[#FAFAFA] font-semibold">
+                  Bundle Sizes (Comma-Separated) *
                 </label>
                 <input
                   type="text"
@@ -519,26 +524,26 @@ export const BookingView: React.FC<BookingViewProps> = ({
                   value={bundleInput}
                   onChange={(e) => setBundleInput(e.target.value)}
                   placeholder="e.g. 2, 5, 10"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                  className="w-full bg-[#09090B] border border-[#262A35] rounded-xl px-3.5 py-2 text-xs text-[#FAFAFA] font-mono focus:outline-none focus:border-[#E53935] disabled:opacity-50"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="text-[11px] text-[#A1A1AA] mt-1">
                   Enter 1 to 10 distinct integer bundle capacities between 1 and 500 (e.g. "6, 9, 20").
                 </p>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+              <div className="flex justify-end space-x-2 pt-3 border-t border-[#262A35]">
                 <button
                   type="button"
                   disabled={isCreatingCinema}
                   onClick={() => setIsModalOpen(false)}
-                  className="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition-colors disabled:opacity-40"
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#262A35] transition-colors disabled:opacity-40"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isCreatingCinema}
-                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-colors disabled:opacity-50 flex items-center space-x-1.5"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#E53935] hover:bg-[#D32F2F] text-white transition-colors disabled:opacity-50 flex items-center space-x-1.5 shadow-sm"
                 >
                   {isCreatingCinema && (
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
