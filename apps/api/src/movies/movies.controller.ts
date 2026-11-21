@@ -14,6 +14,7 @@ import { MoviesService } from './movies.service';
 import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { MovieResponseDto } from './dto/movie-response.dto';
+import { RewatchOrderResponseDto } from './dto/rewatch-order-response.dto';
 
 @ApiTags('Movies')
 @Controller('movies')
@@ -43,6 +44,23 @@ export class MoviesController {
   })
   async findAll(): Promise<MovieResponseDto[]> {
     return this.moviesService.findAll();
+  }
+
+  @Get(':id/rewatch-order')
+  @ApiOperation({
+    summary: 'Calculate valid prerequisite-first rewatch sequence and metrics',
+  })
+  @ApiParam({ name: 'id', description: 'Target movie UUID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Rewatch plan and summary metrics',
+    type: RewatchOrderResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Target movie not found' })
+  async getRewatchOrder(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<RewatchOrderResponseDto> {
+    return this.moviesService.getRewatchOrder(id);
   }
 
   @Patch(':id')

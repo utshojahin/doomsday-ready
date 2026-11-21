@@ -8,8 +8,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { MovieResponseDto, PrerequisiteMovieDto } from './dto/movie-response.dto';
+import { RewatchOrderResponseDto } from './dto/rewatch-order-response.dto';
 import { CircularDependencyException } from '../common/exceptions/circular-dependency.exception';
 import { validateNoCycles } from './algorithms/cycle-detector';
+import { computeRewatchOrder, MovieNode } from './algorithms/rewatch-order';
 import { Movie, MoviePrerequisite, Prisma } from '@prisma/client';
 
 type MovieWithPrerequisites = Movie & {
@@ -208,6 +210,33 @@ export class MoviesService {
     });
 
     return this.findOne(id);
+  }
+
+  async getRewatchOrder(targetId: string): Promise<RewatchOrderResponseDto> {
+    const allMovies = await this.prisma.movie.findMany({
+      include: {
+        prerequisites: true,
+      },
+    });
+
+    const movieMap = new Map<string, MovieNode>();
+    for (const m of allMovies) {
+      movieMap.set(m.id, {
+        id: m.id,
+        title: m.title,
+        releaseYear: m.releaseYear,
+        runtimeMinutes: m.runtimeMinutes,
+        watched: m.watched,
+        prerequisiteIds: m.prerequisites.map((p) => p.prerequisiteId),
+      });
+    }
+
+    const result = computeRewatchOrder(targetId, movieMap);
+    if (!result) {
+      throw new NotFoundException(`Movie with ID '${targetId}' not found.`);
+    }
+
+    return result;
   }
 
   private mapToDto(movie: MovieWithPrerequisites): MovieResponseDto {

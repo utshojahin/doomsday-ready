@@ -1,36 +1,71 @@
-import React, { useState } from 'react';
-import { Movie, Cinema } from './types';
-import { INITIAL_MOVIES, INITIAL_CINEMAS } from './data/sampleData';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Movie, Cinema, CreateMovieInput, UpdateMovieInput } from './types';
 import { Navbar, ActiveTab } from './components/Navbar';
 import { MoviesView } from './features/movies/MoviesView';
 import { RewatchPlanView } from './features/rewatch/RewatchPlanView';
 import { BookingView } from './features/booking/BookingView';
+import { fetchMovies, fetchCinemas, createMovie, updateMovie } from './api/client';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('movies');
-  const [movies, setMovies] = useState<Movie[]>(INITIAL_MOVIES);
-  const [cinemas, setCinemas] = useState<Cinema[]>(INITIAL_CINEMAS);
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [cinemas, setCinemas] = useState<Cinema[]>([]);
+  const [isLoadingMovies, setIsLoadingMovies] = useState<boolean>(true);
+  const [moviesError, setMoviesError] = useState<string | null>(null);
+  const [isLoadingCinemas, setIsLoadingCinemas] = useState<boolean>(true);
 
-  const handleToggleWatched = (movieId: string) => {
-    setMovies((prev) =>
-      prev.map((m) => (m.id === movieId ? { ...m, watched: !m.watched } : m)),
-    );
+  const loadMovies = useCallback(async () => {
+    setIsLoadingMovies(true);
+    setMoviesError(null);
+    try {
+      const data = await fetchMovies();
+      setMovies(data);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load movies.';
+      setMoviesError(message);
+    } finally {
+      setIsLoadingMovies(false);
+    }
+  }, []);
+
+  const loadCinemas = useCallback(async () => {
+    setIsLoadingCinemas(true);
+    try {
+      const data = await fetchCinemas();
+      setCinemas(data);
+    } catch {
+      // Non-fatal on startup
+    } finally {
+      setIsLoadingCinemas(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMovies();
+    loadCinemas();
+  }, [loadMovies, loadCinemas]);
+
+  const handleToggleWatched = async (movieId: string) => {
+    const movie = movies.find((m) => m.id === movieId);
+    if (!movie) return;
+
+    const nextWatched = !movie.watched;
+    const updated = await updateMovie(movieId, { watched: nextWatched });
+    setMovies((prev) => prev.map((m) => (m.id === movieId ? updated : m)));
   };
 
-  const handleAddMovie = (newMovie: Omit<Movie, 'id'>) => {
-    const id = `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    setMovies((prev) => [...prev, { ...newMovie, id }]);
+  const handleAddMovie = async (newMovie: CreateMovieInput) => {
+    const created = await createMovie(newMovie);
+    setMovies((prev) => [...prev, created]);
   };
 
-  const handleUpdateMovie = (updatedMovie: Movie) => {
-    setMovies((prev) =>
-      prev.map((m) => (m.id === updatedMovie.id ? updatedMovie : m)),
-    );
+  const handleUpdateMovie = async (id: string, updatedFields: UpdateMovieInput) => {
+    const updated = await updateMovie(id, updatedFields);
+    setMovies((prev) => prev.map((m) => (m.id === id ? updated : m)));
   };
 
-  const handleAddCinema = (newCinema: Omit<Cinema, 'id'>) => {
-    const id = `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    setCinemas((prev) => [...prev, { ...newCinema, id }]);
+  const handleCinemaCreated = async () => {
+    await loadCinemas();
   };
 
   return (
@@ -47,6 +82,9 @@ export const App: React.FC = () => {
         {activeTab === 'movies' && (
           <MoviesView
             movies={movies}
+            isLoading={isLoadingMovies}
+            error={moviesError}
+            onRetry={loadMovies}
             onToggleWatched={handleToggleWatched}
             onAddMovie={handleAddMovie}
             onUpdateMovie={handleUpdateMovie}
@@ -63,7 +101,8 @@ export const App: React.FC = () => {
         {activeTab === 'booking' && (
           <BookingView
             cinemas={cinemas}
-            onAddCinema={handleAddCinema}
+            isLoading={isLoadingCinemas}
+            onCinemaCreated={handleCinemaCreated}
           />
         )}
       </main>
@@ -73,7 +112,7 @@ export const App: React.FC = () => {
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>Doomsday Ready — MCU Rewatch & Opening Night Ticket Optimizer</span>
           <span className="font-mono text-[11px] text-slate-600">
-            Handwritten Algorithms · Strict TypeScript · Tailwind CSS
+            Handwritten Graph DFS & Unbounded Knapsack DP · Strict TypeScript · Tailwind CSS
           </span>
         </div>
       </footer>

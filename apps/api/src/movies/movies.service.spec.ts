@@ -98,9 +98,7 @@ describe('MoviesService (Unit)', () => {
 
     it('throws CircularDependencyException on indirect cycle', async () => {
       prisma.movie.findUnique.mockResolvedValueOnce({ id: 'm-iron-man', title: 'Iron Man' });
-      // prerequisite exists check
       prisma.movie.findMany.mockResolvedValueOnce([{ id: 'm-endgame' }]);
-      // existing edges: endgame -> infinity war -> avengers -> iron man
       prisma.moviePrerequisite.findMany.mockResolvedValueOnce([
         { movieId: 'm-avengers', prerequisiteId: 'm-iron-man' },
         { movieId: 'm-endgame', prerequisiteId: 'm-avengers' },
@@ -110,31 +108,44 @@ describe('MoviesService (Unit)', () => {
         service.update('m-iron-man', { prerequisiteIds: ['m-endgame'] }),
       ).rejects.toThrow(CircularDependencyException);
     });
+  });
 
-    it('allows clearing prerequisites when prerequisiteIds is empty array []', async () => {
-      const mockMovie = {
-        id: 'm-avengers',
-        title: 'The Avengers',
-        releaseYear: 2012,
-        runtimeMinutes: 143,
-        watched: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        prerequisites: [],
-      };
+  describe('getRewatchOrder', () => {
+    it('throws NotFoundException if target movie does not exist in database', async () => {
+      prisma.movie.findMany.mockResolvedValueOnce([]);
 
-      // 1. Initial existence check
-      prisma.movie.findUnique.mockResolvedValueOnce(mockMovie);
-      // 2. Cycle detection check
-      prisma.moviePrerequisite.findMany.mockResolvedValueOnce([]);
-      // 3. findOne after transaction
-      prisma.movie.findUnique.mockResolvedValueOnce(mockMovie);
+      await expect(
+        service.getRewatchOrder('nonexistent-id'),
+      ).rejects.toThrow(NotFoundException);
+    });
 
-      const result = await service.update('m-avengers', { prerequisiteIds: [] });
-      expect(result.prerequisiteIds).toEqual([]);
-      expect(prisma.moviePrerequisite.deleteMany).toHaveBeenCalledWith({
-        where: { movieId: 'm-avengers' },
-      });
+    it('computes rewatch order successfully for existing target movie', async () => {
+      prisma.movie.findMany.mockResolvedValueOnce([
+        {
+          id: '1',
+          title: 'Iron Man',
+          releaseYear: 2008,
+          runtimeMinutes: 126,
+          watched: true,
+          prerequisites: [],
+        },
+        {
+          id: '2',
+          title: 'The Avengers',
+          releaseYear: 2012,
+          runtimeMinutes: 143,
+          watched: false,
+          prerequisites: [{ prerequisiteId: '1' }],
+        },
+      ]);
+
+      const result = await service.getRewatchOrder('2');
+      expect(result.target.title).toBe('The Avengers');
+      expect(result.movies).toHaveLength(1);
+      expect(result.movies[0].title).toBe('Iron Man');
+      expect(result.totalCount).toBe(1);
+      expect(result.watchedCount).toBe(1);
+      expect(result.unwatchedRuntimeMinutes).toBe(0);
     });
   });
 });

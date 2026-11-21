@@ -9,6 +9,9 @@ describe('Movies API (e2e)', () => {
   let prisma: PrismaService;
   let ironManId: string;
   let endgameId: string;
+  let doomsdayId: string;
+  let civilWarId: string;
+  let ragnarokId: string;
   let testMovieId: string;
 
   beforeAll(async () => {
@@ -32,8 +35,15 @@ describe('Movies API (e2e)', () => {
     // Retrieve seeded movies
     const ironMan = await prisma.movie.findFirst({ where: { title: 'Iron Man' } });
     const endgame = await prisma.movie.findFirst({ where: { title: 'Avengers: Endgame' } });
+    const doomsday = await prisma.movie.findFirst({ where: { title: 'Avengers: Doomsday' } });
+    const civilWar = await prisma.movie.findFirst({ where: { title: 'Captain America: Civil War' } });
+    const ragnarok = await prisma.movie.findFirst({ where: { title: 'Thor: Ragnarok' } });
+
     ironManId = ironMan?.id || '';
     endgameId = endgame?.id || '';
+    doomsdayId = doomsday?.id || '';
+    civilWarId = civilWar?.id || '';
+    ragnarokId = ragnarok?.id || '';
 
     // Create a dedicated movie for PATCH tests
     const created = await prisma.movie.create({
@@ -143,7 +153,7 @@ describe('Movies API (e2e)', () => {
           title: `Movie with Bad Prereq ${Date.now()}`,
           releaseYear: 2024,
           runtimeMinutes: 120,
-          prerequisiteIds: ['00000000-0000-0000-0000-000000000000'],
+          prerequisiteIds: ['a0000000-0000-4000-8000-000000000000'],
         })
         .expect(400);
     });
@@ -221,7 +231,6 @@ describe('Movies API (e2e)', () => {
         .expect(200);
 
       expect(res.body.watched).toBe(false);
-      // Prerequisite still retained
       expect(res.body.prerequisiteIds).toContain(ironManId);
     });
 
@@ -248,7 +257,7 @@ describe('Movies API (e2e)', () => {
       const res = await request(app.getHttpServer())
         .patch(`/api/movies/${ironManId}`)
         .send({
-          prerequisiteIds: [ironManId], // direct self-dependency
+          prerequisiteIds: [ironManId],
         })
         .expect(409);
 
@@ -256,8 +265,6 @@ describe('Movies API (e2e)', () => {
     });
 
     it('ASSESSMENT BENCHMARK: Making Avengers: Endgame a prerequisite of Iron Man returns 409 CIRCULAR_DEPENDENCY', async () => {
-      // Iron Man -> (The Avengers) -> (Civil War) -> (Infinity War) -> (Endgame)
-      // Making Endgame a prerequisite of Iron Man introduces an indirect cycle!
       const res = await request(app.getHttpServer())
         .patch(`/api/movies/${ironManId}`)
         .send({
@@ -269,12 +276,72 @@ describe('Movies API (e2e)', () => {
       expect(res.body).toHaveProperty('code', 'CIRCULAR_DEPENDENCY');
       expect(res.body.message).toMatch(/cycle/i);
 
-      // Verify ATOMICITY: Iron Man prerequisites remain intact and unchanged in database
+      // Verify atomicity
       const ironManDb = await prisma.movie.findUnique({
         where: { id: ironManId },
         include: { prerequisites: true },
       });
       expect(ironManDb?.prerequisites.map((p) => p.prerequisiteId)).not.toContain(endgameId);
+    });
+  });
+
+  describe('GET /api/movies/:id/rewatch-order', () => {
+    it('ASSESSMENT TEST CASE: Thor: Ragnarok returns empty list and 0 metrics', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/movies/${ragnarokId}/rewatch-order`)
+        .expect(200);
+
+      expect(res.body.target.title).toBe('Thor: Ragnarok');
+      expect(res.body.movies).toEqual([]);
+      expect(res.body.totalCount).toBe(0);
+      expect(res.body.watchedCount).toBe(0);
+      expect(res.body.unwatchedRuntimeMinutes).toBe(0);
+    });
+
+    it('ASSESSMENT TEST CASE: Captain America: Civil War returns Iron Man & First Avenger before The Avengers', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/movies/${civilWarId}/rewatch-order`)
+        .expect(200);
+
+      expect(res.body.target.title).toBe('Captain America: Civil War');
+      expect(res.body.totalCount).toBe(3);
+
+      const titles = res.body.movies.map((m: { title: string }) => m.title);
+      expect(titles).toContain('Iron Man');
+      expect(titles).toContain('Captain America: The First Avenger');
+      expect(titles).toContain('The Avengers');
+      expect(titles).not.toContain('Captain America: Civil War'); // Target excluded
+
+      const avengersIdx = titles.indexOf('The Avengers');
+      const ironManIdx = titles.indexOf('Iron Man');
+      const firstAvengerIdx = titles.indexOf('Captain America: The First Avenger');
+      expect(ironManIdx).toBeLessThan(avengersIdx);
+      expect(firstAvengerIdx).toBeLessThan(avengersIdx);
+    });
+
+    it('ASSESSMENT TEST CASE: Avengers: Doomsday includes all 7 other movies in valid topological order', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/movies/${doomsdayId}/rewatch-order`)
+        .expect(200);
+
+      expect(res.body.target.title).toBe('Avengers: Doomsday');
+      expect(res.body.totalCount).toBe(7);
+      expect(res.body.movies.map((m: { id: string }) => m.id)).not.toContain(doomsdayId);
+
+      const indices = new Map<string, number>(
+        res.body.movies.map((m: { id: string }, i: number) => [m.id, i]),
+      );
+      expect(indices.get(ironManId)!).toBeLessThan(indices.get(civilWarId)!);
+      expect(indices.get(civilWarId)!).toBeLessThan(indices.get(endgameId)!);
+
+      expect(typeof res.body.watchedCount).toBe('number');
+      expect(typeof res.body.unwatchedRuntimeMinutes).toBe('number');
+    });
+
+    it('returns 404 Not Found for nonexistent target movie UUID', async () => {
+      await request(app.getHttpServer())
+        .get('/api/movies/a0000000-0000-4000-8000-000000000000/rewatch-order')
+        .expect(404);
     });
   });
 });
