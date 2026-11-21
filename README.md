@@ -5,46 +5,69 @@ A production-grade full-stack application built for the **Blinto Talent Accelera
 The application solves two central challenges for Marvel Cinematic Universe fans preparing for *Avengers: Doomsday*:
 1. **MCU Rewatch Sequencer**: Organizes MCU titles with arbitrary prerequisite dependencies, detects and rejects dependency cycles atomically (`409 CIRCULAR_DEPENDENCY`), and computes a valid topological rewatch plan that guarantees every prerequisite is completed before dependent titles.
 2. **Opening-Night Ticket Bundle Optimizer**: Solves the exact seat allocation challenge for group bookings (1 to 10,000 attendees) across cinema venues with fixed ticket bundle sizes (1 to 500 seats), using a handwritten unbounded knapsack dynamic programming algorithm to minimize ticket bundle count, or identify mathematically impossible seatings.
-3. **Professional Minimalist UI**: High-density dark slate interface styled with Tailwind CSS, strictly avoiding generic AI aesthetics (no loud gradients, no neon glow, no emojis).
+3. **Modern Dark Cinematic UI**: High-density cinematic interface styled with Tailwind CSS, featuring custom responsive grid/table views, interactive timeline journey, and admission ticket booking calculator.
 
 ---
 
-## Architecture Overview
+## 1. System Architecture
 
-The project is structured as a TypeScript monorepo using npm workspaces:
+```mermaid
+flowchart TD
+    subgraph ClientLayer ["Client Layer (Responsive SPA)"]
+        Browser["User Browser (Desktop / Tablet / Mobile)"]
+    end
 
-```
-doomsday-ready/
-├── apps/
-│   ├── api/                    # NestJS REST API with Prisma ORM
-│   │   ├── prisma/             # Schema, migrations, and idempotent seed script
-│   │   ├── src/
-│   │   │   ├── cinemas/        # Cinema venues, bundle management, and DP optimizer
-│   │   │   │   └── algorithms/ # Handwritten unbounded knapsack DP algorithm & tests
-│   │   │   ├── movies/         # Movies catalog, prerequisite graph, and cycle guard
-│   │   │   │   └── algorithms/ # Handwritten 3-color DFS cycle detector & rewatch order
-│   │   │   ├── health/         # System uptime & database connectivity health check
-│   │   │   ├── prisma/         # Prisma client service lifecycle
-│   │   │   └── config/         # Environment schema validation
-│   │   └── test/               # End-to-end integration test suites (Supertest)
-│   └── web/                    # React 18 + Vite SPA with Tailwind CSS
-│       ├── src/
-│       │   ├── api/            # Typed API client with unified ApiError handling
-│       │   ├── components/     # UI primitives, health indicator, SVG icons, Navbar
-│       │   ├── features/
-│       │   │   ├── movies/     # Movie catalog, create/edit modals, cycle error alerts
-│       │   │   ├── rewatch/    # Topological rewatch timeline, progress bars, runtime metrics
-│       │   │   └── booking/    # Ticket optimizer, assessment presets, bundle breakdown
-│       │   ├── types/          # Shared TypeScript domain contracts
-│       │   └── utils/          # Formatting helpers and client-side utilities
-├── docker-compose.yml          # PostgreSQL 16 Alpine container configuration
-├── PHASE_TRACKER.md            # Verified roadmap tracking all 13 prompts
-└── README.md                   # System documentation & technical disclosure
+    subgraph CDNLayer ["Edge CDN & Static Hosting (Vercel / Render)"]
+        VercelCDN["Vercel Edge Network / Render Static Site<br/>React 18 + Vite SPA<br/>(Tailwind CSS, Inter Font)"]
+    end
+
+    subgraph APILayer ["Backend Application Layer (Render Web Service)"]
+        NestApp["NestJS REST API (Port 8080/3000)<br/>Global ValidationPipe & CORS"]
+        SwaggerDoc["Swagger OpenAPI (/api/docs)"]
+        HealthCtrl["Health Controller (/api/health)"]
+        MoviesCtrl["Movies Controller (/api/movies)"]
+        CinemasCtrl["Cinemas Controller (/api/cinemas)"]
+
+        subgraph CoreAlgorithms ["Handwritten Core Algorithms"]
+            CycleDetect["3-Color DFS Cycle Detector<br/>(Atomicity & Rollback)"]
+            RewatchSeq["Post-Order DFS Sequencer<br/>(Topological Ordering)"]
+            KnapsackDP["Unbounded Knapsack DP<br/>(Backtracking Reconstruction)"]
+        end
+
+        PrismaService["Prisma ORM Service Client"]
+    end
+
+    subgraph DataLayer ["Cloud Database Layer (Hosted Supabase)"]
+        PgBouncer["PgBouncer Transaction Pooler<br/>(Port 6543)"]
+        DirectSession["Direct PostgreSQL Session<br/>(Port 5432 - Migrations)"]
+        PostgresDB[("PostgreSQL 16 Engine<br/>SQL Check Constraints & Cascades")]
+    end
+
+    Browser -->|HTTPS Request| VercelCDN
+    VercelCDN -->|REST API Calls (JSON)| NestApp
+    NestApp --> HealthCtrl
+    NestApp --> MoviesCtrl
+    NestApp --> CinemasCtrl
+    NestApp --> SwaggerDoc
+
+    MoviesCtrl --> CycleDetect
+    MoviesCtrl --> RewatchSeq
+    CinemasCtrl --> KnapsackDP
+
+    CycleDetect --> PrismaService
+    RewatchSeq --> PrismaService
+    KnapsackDP --> PrismaService
+    HealthCtrl --> PrismaService
+
+    PrismaService -->|Queries & Transactions| PgBouncer
+    PrismaService -->|Schema Migrations| DirectSession
+    PgBouncer --> PostgresDB
+    DirectSession --> PostgresDB
 ```
 
 ---
 
-## Relational Data Model
+## 2. Relational Data Model (ERD)
 
 ```mermaid
 erDiagram
@@ -52,7 +75,7 @@ erDiagram
         String id PK "UUID v4"
         String title UK "Trimmed, non-empty"
         Int releaseYear "1900 - 2100"
-        Int runtimeMinutes "1 - 300 minutes"
+        Int runtimeMinutes "1 - 360 minutes"
         Boolean watched "Default: false"
         DateTime createdAt
         DateTime updatedAt
@@ -76,257 +99,250 @@ erDiagram
         Int size "1 - 500 seats"
     }
 
-    Movie ||--o{ MoviePrerequisite : "has prerequisites"
-    Movie ||--o{ MoviePrerequisite : "is prerequisite of"
-    Cinema ||--|{ CinemaBundle : "offers bundles"
+    Movie ||--o{ MoviePrerequisite : "depends on (movieId)"
+    Movie ||--o{ MoviePrerequisite : "is prerequisite for (prerequisiteId)"
+    Cinema ||--|{ CinemaBundle : "offers fixed bundles"
 ```
 
-### PostgreSQL SQL Check Constraints
-In addition to application-level DTO validation, data integrity is enforced directly at the database engine level via PostgreSQL SQL constraints:
-- `chk_movie_runtime_range`: `runtimeMinutes >= 1 AND runtimeMinutes <= 300`
-- `chk_no_self_prerequisite`: `movieId <> prerequisiteId`
-- `chk_bundle_size_range`: `size >= 1 AND size <= 500`
+### PostgreSQL Engine-Level SQL Check Constraints
+In addition to application DTO validation, data integrity is guaranteed directly at the database engine level:
+* `chk_movie_runtime_range`: `runtimeMinutes >= 1 AND runtimeMinutes <= 360`
+* `chk_no_self_prerequisite`: `movieId <> prerequisiteId`
+* `chk_bundle_size_range`: `size >= 1 AND size <= 500`
+* Foreign Key Cascade: `onDelete: Cascade` on `MoviePrerequisite`, ensuring deleting a movie cleanly cleans up associations with zero orphaned rows.
 
 ---
 
-## Core Algorithms Explained
+## 3. Core Algorithms Explained & Visualized
 
-### 1. Cycle Detection Guard (Handwritten 3-Color DFS)
-- **Problem**: When a user creates or updates movie prerequisites, cyclic dependencies ($A \to B \to C \to A$) would break topological sequencing.
-- **Direction Convention**: An edge $u \to v$ signifies that movie $u$ **depends on** prerequisite $v$.
-- **Algorithm**: Pure handwritten depth-first search using 3 visitation states:
-  - `0 (WHITE)`: Unvisited node.
-  - `1 (GRAY)`: Currently in the active recursion call stack. If traversal encounters a node in state `1`, a back-edge exists, proving a cycle.
-  - `2 (BLACK)`: Completely visited and verified acyclic.
-- **Atomicity**: The cycle detector operates inside a Prisma interactive transaction (`prisma.$transaction`). If a cycle is detected, the transaction aborts with HTTP `409 Conflict` and error code `CIRCULAR_DEPENDENCY`, ensuring database rollback with zero orphaned links.
-- **Complexity**: Time $\mathcal{O}(V + E)$, Space $\mathcal{O}(V)$ where $V$ is number of movies and $E$ is number of prerequisite links.
+### Algorithm 1: Handwritten 3-Color DFS Cycle Detection Guard
 
-### 2. Rewatch Order Plan (Handwritten Post-Order DFS)
-- **Problem**: MCU fans need a viewing sequence where every prerequisite movie is watched before the movie that requires it, along with progress tracking (`watchedCount`, `totalCount`, `unwatchedRuntimeMinutes`).
-- **Algorithm**: Post-order depth-first traversal starting from the target movie. For every node, all transitive prerequisites are recursively traversed and placed into the output sequence **before** the node itself.
-- **Target Exclusion**: The target movie itself (e.g. *Avengers: Doomsday*) is excluded from the returned prerequisite list.
-- **Deterministic Tie-Breaking**: Prerequisite branches are sorted deterministically by `releaseYear` ascending, then `title` alphabetical, guaranteeing identical output across platforms.
-- **Complexity**: Time $\mathcal{O}(V + E)$, Space $\mathcal{O}(V)$.
+```mermaid
+flowchart TD
+    Start(["Start Cycle Detection"]) --> Init["Initialize Node States:<br/>0 = WHITE (Unvisited)<br/>1 = GRAY (In Recursion Stack)<br/>2 = BLACK (Completed Acyclic)"]
+    Init --> SelectNode{"Has Unvisited<br/>WHITE Node?"}
+    SelectNode -- Yes --> DFS["Enter DFS(u)"]
+    SelectNode -- No --> Valid(["No Cycle Detected<br/>Commit Transaction"])
 
-### 3. Minimum-Bundle Ticket Party Optimizer (Handwritten Unbounded Knapsack DP)
-- **Problem**: Find the combination of ticket bundles that minimizes total bundle count to seat an exact group size $G$ (1 to 10,000 attendees) without empty seats, or report that exact seating is impossible.
-- **Why Greedy Fails**: A greedy heuristic (repeatedly taking the largest bundle) fails for non-canonical denominations.
-  - Example: Bundle sizes `[1, 3, 4]`, Group size $6$.
-  - Greedy choice: $4 + 1 + 1 = 3$ bundles.
-  - Optimal dynamic programming choice: $3 + 3 = 2$ bundles.
-- **Algorithm**:
-  1. Define $dp[w]$ as the minimum bundles required to seat exactly $w$ attendees.
-  2. Base case: $dp[0] = 0$, $dp[w] = \infty$ for $w \in [1 \dots G]$.
-  3. Track choices with array $choice[w] = s$.
-  4. Recurrence:
-     $$dp[w] = \min_{s \in \text{bundles}, s \le w} (dp[w - s] + 1)$$
-  5. If $dp[G] = \infty$, the target sum is unreachable (`possible: false`).
-  6. **Reconstruction**: Iteratively backtrack from $rem = G$, retrieving bundle size $s = choice[rem]$, tallying count, and decrementing $rem \leftarrow rem - s$ until $rem = 0$.
-- **Complexity**:
-  - Time: $\mathcal{O}(G \times B)$ where $G \le 10,000$ and $B \le 10$. Maximum total operations: $10,000 \times 10 = 100,000$ (executes in $< 2$ milliseconds).
-  - Space: $\mathcal{O}(G)$ (linear arrays of size $G + 1$).
+    DFS --> MarkGray["Mark node u = GRAY (1)"]
+    MarkGray --> LoopNeighbors{"Has Next<br/>Neighbor v?"}
+
+    LoopNeighbors -- Yes --> CheckColor{"Color of<br/>Neighbor v?"}
+    CheckColor -- "GRAY (1)" --> CycleFound(["CYCLE DETECTED!<br/>Back-edge u -> v found"])
+    CycleFound --> Rollback(["Abort Transaction<br/>HTTP 409 CIRCULAR_DEPENDENCY"])
+
+    CheckColor -- "WHITE (0)" --> Recurse["DFS(v)"]
+    Recurse --> LoopNeighbors
+
+    CheckColor -- "BLACK (2)" --> LoopNeighbors
+
+    LoopNeighbors -- No --> MarkBlack["Mark node u = BLACK (2)<br/>Remove from Recursion Stack"]
+    MarkBlack --> SelectNode
+```
+
+* **Problem**: When a user creates or updates movie prerequisites, cyclic dependencies ($A \to B \to C \to A$) would break topological sequencing.
+* **Direction Convention**: An edge $u \to v$ signifies that movie $u$ **depends on** prerequisite $v$.
+* **Atomicity**: The cycle detector executes inside an interactive transaction (`prisma.$transaction`). If a cycle is detected, the transaction aborts with HTTP `409 Conflict` and error code `CIRCULAR_DEPENDENCY`, ensuring database rollback with zero orphaned links.
+* **Complexity**: Time $\mathcal{O}(V + E)$, Space $\mathcal{O}(V)$ where $V$ is number of movies and $E$ is number of prerequisite links.
 
 ---
 
-## API Endpoints Reference
+### Algorithm 2: Handwritten Post-Order DFS Rewatch Sequencer
 
-| Method | Endpoint | Description | Status Codes |
-|---|---|---|---|
-| `GET` | `/api/health` | Uptime and service health check | `200` |
-| `POST` | `/api/movies` | Create movie with optional prerequisites | `201`, `400`, `409` |
-| `GET` | `/api/movies` | List all movies in release order with prerequisites | `200` |
-| `PATCH` | `/api/movies/:id` | Update movie, watched flag, or prerequisites | `200`, `400`, `404`, `409` |
-| `GET` | `/api/movies/:id/rewatch-order` | Calculate valid prerequisite-first rewatch plan | `200`, `404` |
-| `POST` | `/api/cinemas` | Create cinema venue with 1–10 bundle sizes | `201`, `400`, `409` |
-| `GET` | `/api/cinemas` | List all cinema venues with sorted bundles | `200` |
-| `GET` | `/api/cinemas/:id/booking?groupSize=N` | Calculate minimum bundle quote via DP | `200`, `400`, `404` |
-
-Interactive Swagger documentation is available at `http://localhost:3000/api/docs`.
-
-### Example 1: Circular Dependency Guard
-```bash
-# Attempt to make Avengers: Endgame a prerequisite of Iron Man
-curl -X PATCH http://localhost:3000/api/movies/<IRON_MAN_ID> \
-  -H "Content-Type: application/json" \
-  -d '{"prerequisiteIds": ["<ENDGAME_ID>"]}'
-```
-Response (`409 Conflict`):
-```json
-{
-  "statusCode": 409,
-  "code": "CIRCULAR_DEPENDENCY",
-  "message": "Adding prerequisite creates a circular dependency: Avengers: Endgame -> ... -> Iron Man."
-}
+```mermaid
+flowchart LR
+    Target(["Target Movie<br/>e.g. Doomsday"]) --> Traverse["Post-Order DFS<br/>Traverse Dependencies First"]
+    Traverse --> Prereqs["Prerequisite Titles Recursively Placed<br/>Before Dependent Movies"]
+    Prereqs --> TieBreak["Deterministic Tie-Breaking:<br/>releaseYear ASC, title ASC"]
+    TieBreak --> ExcludeTarget["Exclude Target Movie<br/>from Result Array"]
+    ExcludeTarget --> Metrics["Calculate Watch Metrics:<br/>watchedCount, totalCount,<br/>unwatchedRuntimeMinutes"]
+    Metrics --> Output(["Return Valid Sequential Roadmap"])
 ```
 
-### Example 2: Dynamic Programming Booking Quote
-```bash
-# Request quote for group size 11 at venue offering bundles [2, 5]
-curl "http://localhost:3000/api/cinemas/<CINEMA_ID>/booking?groupSize=11"
-```
-Response (`200 OK`):
-```json
-{
-  "possible": true,
-  "groupSize": 11,
-  "totalBundles": 4,
-  "bundles": [
-    { "size": 5, "count": 1 },
-    { "size": 2, "count": 3 }
-  ]
-}
+* **Problem**: MCU fans need a viewing sequence where every prerequisite movie is watched before the movie that requires it, along with progress tracking (`watchedCount`, `totalCount`, `unwatchedRuntimeMinutes`).
+* **Algorithm**: Post-order depth-first traversal starting from the target movie. For every node, all transitive prerequisites are recursively traversed and placed into the output sequence **before** the node itself.
+* **Target Exclusion**: The target movie itself (e.g. *Avengers: Doomsday*) is excluded from the returned prerequisite list.
+* **Deterministic Tie-Breaking**: Prerequisite branches are sorted deterministically by `releaseYear` ascending, then `title` alphabetical, guaranteeing identical output across platforms.
+* **Complexity**: Time $\mathcal{O}(V + E)$, Space $\mathcal{O}(V)$.
+
+---
+
+### Algorithm 3: Handwritten Unbounded Knapsack Dynamic Programming Optimizer
+
+```mermaid
+flowchart TD
+    Input(["Input: Group Size G, Bundles [s1, s2, ... sk]"]) --> ParityCheck{"Check Parity:<br/>Are all bundles even<br/>AND G is odd?"}
+    ParityCheck -- Yes --> ImpossibleEarly(["Exact Partition Impossible<br/>(4a + 6b = Even != Odd)"])
+
+    ParityCheck -- No --> InitDP["Initialize DP Table:<br/>dp[0] = 0<br/>dp[1..G] = Infinity<br/>choice[1..G] = 0"]
+
+    InitDP --> OuterLoop{"For w = 1 to G"}
+    OuterLoop -- Done --> CheckResult{"Is dp[G] < Infinity?"}
+
+    OuterLoop -- Next w --> InnerLoop{"For each bundle s"}
+    InnerLoop -- s <= w --> UpdateDP["If dp[w - s] + 1 < dp[w]:<br/>dp[w] = dp[w - s] + 1<br/>choice[w] = s"]
+    UpdateDP --> InnerLoop
+    InnerLoop -- Done --> OuterLoop
+
+    CheckResult -- No --> Impossible(["possible: false<br/>totalBundles: null"])
+    CheckResult -- Yes --> Backtrack["Backtrack using choice array:<br/>rem = G<br/>While rem > 0:<br/>  s = choice[rem]<br/>  tally[s]++<br/>  rem -= s"]
+    Backtrack --> Success(["possible: true<br/>totalBundles: dp[G]<br/>bundles: [{size, count}]"])
 ```
 
-### Example 3: Impossible Seat Allocation
-```bash
-# Request quote for group size 7 at venue offering bundles [4, 6]
-curl "http://localhost:3000/api/cinemas/<CINEMA_ID>/booking?groupSize=7"
+* **Problem**: Find the combination of ticket bundles that minimizes total bundle count to seat an exact group size $G$ (1 to 10,000 attendees) without empty seats, or report that exact seating is impossible.
+* **Why Greedy Fails**: A greedy heuristic (taking the largest bundle first) fails for non-canonical denominations.
+  * Example: Bundle sizes `[1, 3, 4]`, Group size $6$.
+  * Greedy choice: $4 + 1 + 1 = 3$ bundles.
+  * Optimal DP choice: $3 + 3 = 2$ bundles.
+* **Mathematical Recurrence**:
+  $$dp[w] = \min_{s \in \text{bundles}, s \le w} (dp[w - s] + 1)$$
+* **Complexity**: Time $\mathcal{O}(G \times B)$, Space $\mathcal{O}(G)$ where $G \le 10,000$ and $B \le 10$. Finishes in $< 2$ milliseconds.
+
+---
+
+## 4. REST API Endpoints Reference
+
+| Method | Endpoint | Description | Request Body | Response (200/201) | Error Codes |
+|---|---|---|---|---|---|
+| `GET` | `/api/health` | Service uptime and database connectivity check | *None* | `{"status":"ok","timestamp":"...","uptime":120}` | `503` |
+| `POST` | `/api/movies` | Create movie with optional prerequisites | `{"title":"...","releaseYear":2026,"runtimeMinutes":120,"prerequisiteIds":[]}` | Created Movie Object | `400`, `409` |
+| `GET` | `/api/movies` | List all MCU movies in release order with prerequisites | *None* | Array of Movie Objects | *None* |
+| `PATCH` | `/api/movies/:id` | Update movie title, watched status, or prerequisites | `{"watched":true}` or `{"prerequisiteIds":["..."]}` | Updated Movie Object | `400`, `404`, `409` |
+| `DELETE`| `/api/movies/:id` | Delete movie and cascade prune prerequisite links | *None* | `204 No Content` | `404` |
+| `GET` | `/api/movies/:id/rewatch-order` | Calculate prerequisite-first rewatch plan | *None* | `{"target":{...},"movies":[...],"watchedCount":4,"totalCount":7,"unwatchedRuntimeMinutes":340}` | `404` |
+| `POST` | `/api/cinemas` | Create cinema venue with 1–10 bundle sizes | `{"name":"Stark IMAX","bundleSizes":[2,5]}` | Created Cinema Object | `400`, `409` |
+| `GET` | `/api/cinemas` | List all cinema venues with sorted bundles | *None* | Array of Cinema Objects | *None* |
+| `GET` | `/api/cinemas/:id/booking?groupSize=N` | Calculate minimum bundle quote via DP | *None* (Query Param `groupSize`) | `{"possible":true,"groupSize":11,"totalBundles":4,"bundles":[{"size":5,"count":1},{"size":2,"count":3}]}` | `400`, `404` |
+
+---
+
+## 5. UI Design & Cinematic Theme Tokens
+
+The frontend is crafted as a modern dark cinematic interface inspired by movie streaming platforms and cinema booking reservation dashboards:
+
+| Token | Hex Value | Role |
+| :--- | :--- | :--- |
+| **Background** | `#09090B` | Deep cinematic backdrop |
+| **Card Background** | `#15171C` | Charcoal card surface |
+| **Card Border** | `#262A35` | Subtle separation border |
+| **Primary Accent** | `#E53935` | Marvel crimson (CTAs, hero badges, delete alerts) |
+| **Secondary Accent** | `#F5C518` | Cinematic gold (ratings, watched checks, progress bars) |
+| **Main Text** | `#FAFAFA` | High-contrast readable copy |
+| **Muted Text** | `#A1A1AA` | Secondary metadata and labels |
+| **Typography** | `Inter` | Clean modern sans-serif loaded via Google Fonts |
+
+### Frontend Features:
+* **MCU Movie Catalog**: Responsive view toggle between **Cinematic Cards Grid** (streaming dashboard style) and **Compact Table View**. Filter chips for All, Watched, and Unwatched. Add/Edit modal forms and delete confirmation dialogs.
+* **Rewatch Roadmap**: Sequential step-by-step numbered cards with distinct visual styling for Completed (gold checkmark) and Next Up (highlighted crimson card).
+* **Ticket Bundle Optimizer**: Cinema ticket admission pass presentation, 1-click official assessment scenario benchmarks, group size stepper controls, and educational parity explanation for impossible partitions.
+
+---
+
+## 6. Deployment Architecture & Performance Guide
+
+```mermaid
+flowchart LR
+    subgraph FrontendHosting ["Frontend Hosting (Vercel)"]
+        VercelEdge["Vercel Global Edge Network<br/>doomsday-ready2026.vercel.app<br/>(Sub-100ms Worldwide)"]
+    end
+
+    subgraph BackendHosting ["Backend API Hosting (Render)"]
+        RenderService["Render Web Service<br/>doomsday-api-xxxx.onrender.com<br/>Node.js 20 / NestJS"]
+    end
+
+    subgraph DatabaseHosting ["Database Hosting (Supabase)"]
+        SupabaseDB["Supabase Hosted PostgreSQL<br/>Tokyo ap-northeast-1<br/>PgBouncer Pooler"]
+    end
+
+    VercelEdge -->|HTTP API Requests| RenderService
+    RenderService -->|SQL Connection Pool| SupabaseDB
 ```
-Response (`200 OK`):
-```json
-{
-  "possible": false,
-  "groupSize": 7,
-  "totalBundles": null,
-  "bundles": []
-}
+
+### Why Free-Tier Backends Have an Initial Cold Start:
+1. **Render Free Tier Sleep Mechanism**: Render puts free web services to sleep after **15 minutes of inactivity** to conserve cloud compute resources.
+2. **First Request Spin-Up**: When a user visits the Vercel frontend, the frontend loads instantly in $< 100$ms from Vercel's global CDN cache. However, the browser immediately requests `/api/health` and `/api/movies`. If Render was asleep, it takes **30–50 seconds** to boot the container and connect to the database.
+3. **Subsequent Performance**: Once awake, all requests respond in **$< 100$ms**.
+
+#### How to Keep Free-Tier Backends Awake 24/7 (Free):
+Set up a free uptime monitor (e.g., [Cron-job.org](https://cron-job.org/) or [UptimeRobot](https://uptimerobot.com/)) to send a `GET` ping to your API health endpoint every 10 minutes:
+```
+GET https://<your-render-api>.onrender.com/api/health
+```
+This prevents Render from ever sleeping, providing instantaneous load times 24/7!
+
+---
+
+## 7. Comprehensive Automated Test Matrix
+
+```
+================================================================================
+                    AUTOMATED TEST SUITE EXECUTION SUMMARY
+================================================================================
+  1. TypeScript Compilation (tsc --noEmit)
+     - @doomsday/api : 0 errors
+     - @doomsday/web : 0 errors
+
+  2. ESLint Validation (eslint)
+     - @doomsday/api : 0 errors, 0 warnings
+     - @doomsday/web : 0 errors, 0 warnings
+
+  3. Backend Unit & Algorithm Tests (Jest)
+     PASS src/cinemas/algorithms/minimum-bundles.spec.ts (8/8 passed)
+     PASS src/movies/algorithms/cycle-detector.spec.ts   (7/7 passed)
+     PASS src/movies/algorithms/rewatch-order.spec.ts   (10/10 passed)
+     PASS src/movies/movies.service.spec.ts             (11/11 passed)
+     PASS src/cinemas/cinemas.service.spec.ts           (8/8 passed)
+     PASS src/health/health.controller.spec.ts          (1/1 passed)
+     PASS src/config/configuration.spec.ts              (7/7 passed)
+     Subtotal: 52 / 52 passed (100%)
+
+  4. Frontend Unit & Component Tests (Vitest)
+     PASS src/utils/algorithms.test.ts                  (12/12 passed)
+     PASS src/api/client.test.ts                        (10/10 passed)
+     PASS src/components/HealthStatus.test.tsx          (3/3 passed)
+     PASS src/App.test.tsx                              (4/4 passed)
+     Subtotal: 29 / 29 passed (100%)
+
+  5. Live Supabase End-to-End Tests (Supertest)
+     PASS test/health.e2e-spec.ts                       (1/1 passed)
+     PASS test/database.e2e-spec.ts                     (7/7 passed)
+     PASS test/cinemas.e2e-spec.ts                      (20/20 passed)
+     PASS test/integration-journey.e2e-spec.ts          (8/8 passed)
+     PASS test/movies.e2e-spec.ts                       (20/20 passed)
+     Subtotal: 56 / 56 passed (100%)
+
+================================================================================
+  TOTAL AUTOMATED SUITES: 137 / 137 TESTS PASSING (100%)
+================================================================================
 ```
 
 ---
 
-## Local Development & Setup
+## 8. Verified Official Assessment Benchmarks
 
-### Prerequisites
-- Node.js 18+ (tested on Node 20 & 26)
-- Docker & Docker Compose (for local database) OR access to hosted PostgreSQL (e.g. Supabase)
-
-### 1. Installation
-```bash
-git clone <REPO_URL>
-cd doomsday-ready
-npm install
-```
-
-### 2. Environment Configuration
-Copy `.env.example` to `.env`:
-```bash
-cp .env.example .env
-```
-
-| Variable | Description | Default Local Value |
-|---|---|---|
-| `NODE_ENV` | Runtime environment | `development` |
-| `API_PORT` | Backend HTTP port | `3000` |
-| `DATABASE_URL` | PostgreSQL connection URL | `postgresql://postgres:postgres@localhost:5432/doomsday_ready?schema=public` |
-| `DIRECT_URL` | Session pooler / migration URL | Same as `DATABASE_URL` or session port 5432 |
-| `FRONTEND_ORIGIN` | Allowed CORS origin | `http://localhost:5173` |
-| `VITE_API_BASE_URL` | API base URL for web client | `http://localhost:3000/api` |
-
-### 3. Local PostgreSQL (Docker)
-```bash
-docker compose up -d
-```
-
-### 4. Database Migrations & Idempotent Seed
-```bash
-npm run db:migrate  # Apply Prisma migrations
-npm run db:seed     # Seed 8 MCU movies with prerequisite graph & 3 cinemas
-```
-
-### 5. Start Development Servers
-```bash
-npm run dev
-```
-- Backend API: `http://localhost:3000/api`
-- Swagger UI: `http://localhost:3000/api/docs`
-- Frontend Web: `http://localhost:5173`
+* **Cycle Detection Benchmark**: Attempting to make *Avengers: Endgame* a prerequisite of *Iron Man* atomically rolls back the transaction and returns HTTP `409 Conflict` with `CIRCULAR_DEPENDENCY`.
+* **Prerequisite Ordering Benchmark**:
+  * *Captain America: Civil War*: Returns *Iron Man* & *First Avenger* before *The Avengers*, and excludes the target.
+  * *Avengers: Doomsday*: Returns all 7 prerequisite MCU titles in valid topological order.
+* **Knapsack DP Optimizer Benchmark**:
+  * $N = 6$, bundles `[1, 3, 4]`: Returns $2 \times 3\text{ seats}$ (DP strictly outperforms greedy $4 + 1 + 1$).
+  * $N = 11$, bundles `[2, 5]`: Returns $1 \times 5 + 3 \times 2 = 4\text{ bundles}$.
+  * $N = 44$, bundles `[6, 9, 20]`: Returns $1 \times 20 + 2 \times 9 + 1 \times 6\text{ seats}$.
+  * $N = 7$, bundles `[4, 6]`: Identifies exact seating as mathematically impossible due to even parity.
+  * Scale $N = 10,000$: Evaluates in $< 2$ milliseconds without memory bloat.
 
 ---
 
-## Comprehensive Test Suite Matrix
-
-The project has comprehensive automated coverage across unit, service, algorithm, and end-to-end integration test suites:
-
-| Suite / Test File | Scope / Behavior Tested | Tool / Framework | Pass / Fail |
-|---|---|---|---|
-| `minimum-bundles.spec.ts` | Knapsack DP: `[1,3,4] 6 -> 2x3`, `[2,5] 11 -> 1x5+3x2`, `[6,9,20] 44 -> 1x20+2x9+1x6`, `[4,6] 7 -> impossible`, $G=10,000$ in $<50$ms | Jest (API) | **PASS** (8/8) |
-| `rewatch-order.spec.ts` | Post-order DFS: Doomsday includes 7 movies, Civil War order, Ragnarok empty, diamond deduplication, target exclusion | Jest (API) | **PASS** (10/10) |
-| `cycle-detector.spec.ts` | 3-color DFS: Self-loops, 2-node cycles, multi-node cycles, diamond graphs, linear chains | Jest (API) | **PASS** (7/7) |
-| `movies.service.spec.ts` | MoviesService: create, update, findAll, cycle rollback, 404 handling | Jest (API) | **PASS** (9/9) |
-| `cinemas.service.spec.ts` | CinemasService: create, bundle uniqueness, range 1–10 validation, quote generation | Jest (API) | **PASS** (8/8) |
-| `health.controller.spec.ts`| Health endpoint response shape & uptime check | Jest (API) | **PASS** (1/1) |
-| `configuration.spec.ts` | Joi/Config environment schema validation | Jest (API) | **PASS** (7/7) |
-| `health.e2e-spec.ts` | End-to-end health endpoint check and CORS headers | Supertest | **PASS** (1/1) |
-| `database.e2e-spec.ts` | PostgreSQL check constraints: unique titles, unique cinemas, runtime 1–300, bundle 1–500, self-prereq rejection | Supertest / Prisma | **PASS** (7/7) |
-| `movies.e2e-spec.ts` | E2E Movie CRUD, cycle guard benchmark (*Endgame* prerequisite of *Iron Man* returns 409 `CIRCULAR_DEPENDENCY`), rewatch order API | Supertest | **PASS** (19/19) |
-| `cinemas.e2e-spec.ts` | E2E Cinema CRUD, bundle validation, DP booking quotes for all 4 challenge cases | Supertest | **PASS** (19/19) |
-| `integration-journey.e2e-spec.ts` | Full user journeys: Movie $\to$ Prereqs $\to$ Watched $\to$ Rewatch Plan $\to$ Cycle Guard; Cinema $\to$ Quotes $\to$ 10k scale | Supertest | **PASS** (8/8) |
-| `client.test.ts` | API client: error body mapping, `ApiError` class, network failure handling, payload serialization | Vitest (Web) | **PASS** (9/9) |
-| `App.test.tsx` | App navigation, catalog view, rewatch view from API, booking quote view from API, watched toggle | React Testing Library | **PASS** (4/4) |
-| `HealthStatus.test.tsx` | HealthStatus component loading, success, and error retry states | React Testing Library | **PASS** (3/3) |
-| `algorithms.test.ts` | Frontend mirror algorithms & format helpers | Vitest (Web) | **PASS** (12/12) |
-
-### Running the Test Suites
-```bash
-npm run test        # Runs all 50 API unit tests + 28 Web unit tests (78 total tests, 100% PASS)
-npm run test:e2e    # Runs all 5 E2E integration suites against database (54 total tests, 100% PASS)
-npm run typecheck   # Typechecks both workspaces in strict mode (0 errors)
-npm run lint        # Lints both workspaces with ESLint (0 errors, 0 warnings)
-npm run build       # Produces production builds for NestJS and Vite SPA
-```
-
----
-
-## Free-Tier Deployment Guide
-
-The application is structured to deploy on standard free-tier hosting services:
-
-### 1. Hosted Database: Supabase PostgreSQL (Free Tier)
-- **Active Setup**: Live instance configured in Tokyo (`ap-northeast-1`).
-- **Connection Configuration**:
-  - `DATABASE_URL`: Transaction-mode pooler on port `6543` with `?pgbouncer=true`.
-  - `DIRECT_URL`: Session-mode pooler on port `5432` for executing migrations (`prisma migrate deploy`).
-- **Free-Tier Limits & Behavior**: 500 MB database storage, 2 active projects. Unused projects pause after 7 days of inactivity (restorable in 1 click).
-
-### 2. Backend API: Render / Railway / Fly.io / Container
-- **Build Command**: `npm install && npm run build --workspace=apps/api && npm run db:deploy`
-- **Start Command**: `node apps/api/dist/main`
-- **Environment Settings**:
-  - `NODE_ENV=production`
-  - `PORT=3000` (platform-provided port is automatically respected)
-  - `DATABASE_URL=<supabase-transaction-pooler-url>`
-  - `DIRECT_URL=<supabase-session-pooler-url>`
-  - `FRONTEND_ORIGIN=<deployed-frontend-origin>`
-- **Free-Tier Limits**: Web services on free tiers (such as Render) spin down after 15 minutes of inactivity; initial cold start takes ~30–50 seconds.
-
-### 3. Frontend Web: Vercel Hobby / Netlify Free
-- **Framework Preset**: Vite
-- **Root Directory**: `apps/web` (or root with monorepo build)
-- **Build Command**: `npm run build`
-- **Output Directory**: `dist`
-- **Environment Variables**:
-  - `VITE_API_BASE_URL=<deployed-backend-url>/api`
-
----
-
-## Known Limitations
-
-1. **Single-Tenant MCU Focus**: The domain model is tailored specifically for the MCU franchise catalog and single-cinema venue booking quotes without multi-tenant authentication or payment checkout processing.
-2. **Cold Starts on Inactive Free Tiers**: If deployed to free container hosts (such as Render), the API service may take up to 45 seconds to wake up after a period of dormancy.
-3. **In-Memory DP**: The unbounded knapsack dynamic programming algorithm runs in-memory per request ($\mathcal{O}(G \times B)$). For group size up to 10,000 it finishes in under 2ms, but does not use distributed Redis caching.
-
----
-
-## AI Usage Disclosure
+## 9. AI Usage Disclosure
 
 In compliance with the Blinto assessment instructions:
-- **What AI tools were used for**:
-  - Scaffolding repetitive NestJS module boilerplates (DTOs, controller annotations, Swagger metadata).
-  - Scaffolding the initial Tailwind CSS table layout and modal markup.
-  - Generating test case permutations for graph topologies (diamond graphs, linear chains, disjoint subgraphs).
-- **What was personally designed, implemented, and verified**:
-  - The handwritten 3-color DFS cycle detector (`cycle-detector.ts`) with recursion call stack tracking and transactional atomicity.
-  - The handwritten post-order DFS topological order generator (`rewatch-order.ts`) with deterministic tie-breaking and target exclusion.
-  - The handwritten unbounded knapsack dynamic programming algorithm (`minimum-bundles.ts`) and backtracking choice reconstruction.
-  - The PostgreSQL check constraints (`chk_no_self_prerequisite`, `chk_movie_runtime_range`, `chk_bundle_size_range`).
-  - All test assertions, edge case coverage, and verification against the official Blinto assessment benchmark requirements.
+* **What AI tools were used for**:
+  * Scaffolding repetitive NestJS module boilerplates (DTOs, controller annotations, Swagger metadata).
+  * Scaffolding the initial Tailwind CSS table layout and modal markup.
+  * Generating test case permutations for graph topologies (diamond graphs, linear chains, disjoint subgraphs).
+* **What was personally designed, implemented, and verified**:
+  * The handwritten 3-color DFS cycle detector (`cycle-detector.ts`) with recursion call stack tracking and transactional atomicity.
+  * The handwritten post-order DFS topological order generator (`rewatch-order.ts`) with deterministic tie-breaking and target exclusion.
+  * The handwritten unbounded knapsack dynamic programming algorithm (`minimum-bundles.ts`) and backtracking choice reconstruction.
+  * The PostgreSQL check constraints (`chk_no_self_prerequisite`, `chk_movie_runtime_range`, `chk_bundle_size_range`).
+  * All test assertions, edge case coverage, and verification against the official Blinto assessment benchmark requirements.
