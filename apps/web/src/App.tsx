@@ -78,7 +78,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-3.5 sm:px-4 py-5 sm:py-8">
         {activeTab === 'movies' && (
           <MoviesView
             movies={movies}
@@ -107,8 +107,8 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/90 py-6 text-center text-xs text-slate-500">
+      {/* Footer (with extra bottom spacing on mobile for navigation bar) */}
+      <footer className="border-t border-slate-900 bg-slate-950/90 py-6 mb-16 sm:mb-0 text-center text-xs text-slate-500">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>Doomsday Ready — MCU Rewatch & Opening Night Ticket Optimizer</span>
           <span className="font-mono text-[11px] text-slate-600">

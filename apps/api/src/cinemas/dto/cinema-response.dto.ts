@@ -16,3 +16,4 @@ export class CinemaResponseDto {
   @ApiProperty({ example: '2026-11-21T10:00:00.000Z' })
   updatedAt!: Date;
 }
+

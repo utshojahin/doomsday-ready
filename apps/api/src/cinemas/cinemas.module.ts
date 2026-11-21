@@ -8,3 +8,4 @@ import { CinemasService } from './cinemas.service';
   exports: [CinemasService],
 })
 export class CinemasModule {}
+

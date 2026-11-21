@@ -25,3 +25,4 @@ export class BookingQuoteResponseDto {
   @ApiProperty({ type: [BundleAllocationDto], description: 'List of bundle sizes and quantities' })
   bundles!: BundleAllocationDto[];
 }
+

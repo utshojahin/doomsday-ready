@@ -15,3 +15,4 @@ export class BookingQuoteQueryDto {
   @Max(10000, { message: 'groupSize cannot exceed 10,000' })
   groupSize!: number;
 }
+

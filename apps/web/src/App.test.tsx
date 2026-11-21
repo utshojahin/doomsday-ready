@@ -55,26 +55,26 @@ describe('App Component and Navigation', () => {
   it('renders Movies view by default and lists initial MCU movies', async () => {
     render(<App />);
 
-    expect(screen.getByText(/MCU Movie Catalog/i)).toBeInTheDocument();
+    expect(screen.getByText(/MCU Catalog/i)).toBeInTheDocument();
 
     await waitFor(() => {
       const ironManTitles = screen.getAllByText('Iron Man');
       expect(ironManTitles.length).toBeGreaterThan(0);
-      expect(screen.getByText('Avengers: Doomsday')).toBeInTheDocument();
+      expect(screen.getAllByText('Avengers: Doomsday').length).toBeGreaterThan(0);
     });
   });
 
   it('switches to Rewatch Plan view and calculates prerequisite order from API', async () => {
     render(<App />);
 
-    const rewatchTab = screen.getByRole('button', { name: /Rewatch Plan/i });
-    fireEvent.click(rewatchTab);
+    const rewatchTabs = screen.getAllByRole('button', { name: /Rewatch Plan/i });
+    fireEvent.click(rewatchTabs[0]);
 
-    expect(screen.getByText(/Rewatch Road to Doomsday/i)).toBeInTheDocument();
+    expect(screen.getByText(/Topological Rewatch Sequencer/i)).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByText(/Required Titles/i)).toBeInTheDocument();
-      expect(screen.getByText(/Watched Progress/i)).toBeInTheDocument();
+      expect(screen.getByText(/Required Prerequisite Titles/i)).toBeInTheDocument();
+      expect(screen.getByText(/Preparation Progress/i)).toBeInTheDocument();
       expect(client.fetchRewatchOrder).toHaveBeenCalled();
     });
   });
@@ -82,10 +82,10 @@ describe('App Component and Navigation', () => {
   it('switches to Cinema Booking view and displays bundle calculation from API', async () => {
     render(<App />);
 
-    const bookingTab = screen.getByRole('button', { name: /Cinema Booking/i });
-    fireEvent.click(bookingTab);
+    const bookingTabs = screen.getAllByRole('button', { name: /Cinema Booking/i });
+    fireEvent.click(bookingTabs[0]);
 
-    expect(screen.getByText(/Opening Night Group Ticket Optimizer/i)).toBeInTheDocument();
+    expect(screen.getByText(/Opening Night Ticket Bundle Optimizer/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getAllByText(/Stark IMAX Theatre/i).length).toBeGreaterThan(0);
@@ -106,10 +106,9 @@ describe('App Component and Navigation', () => {
       expect(screen.getAllByText('Iron Man').length).toBeGreaterThan(0);
     });
 
-    const ironManTitles = screen.getAllByText('Iron Man');
-    const ironManRow = ironManTitles[0].closest('tr')!;
-    const toggleButton = ironManRow.querySelector('button')!;
-    fireEvent.click(toggleButton);
+    // Toggle button in table or card
+    const toggleButtons = screen.getAllByTitle(/Mark as unwatched|Mark as watched/i);
+    fireEvent.click(toggleButtons[0]);
 
     await waitFor(() => {
       expect(client.updateMovie).toHaveBeenCalledWith('m-iron-man', { watched: false });

@@ -31,3 +31,4 @@ export class CreateCinemaDto {
   @Max(500, { each: true, message: 'Bundle size must not exceed 500' })
   bundleSizes!: number[];
 }
+

@@ -65,3 +65,4 @@ export class CinemasController {
     return this.cinemasService.getBookingQuote(id, query.groupSize);
   }
 }
+
