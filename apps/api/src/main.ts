@@ -23,9 +23,14 @@ async function bootstrap() {
   );
 
   // CORS configuration
-  const frontendOrigin = configService.get<string>('FRONTEND_ORIGIN', 'http://localhost:5173');
+  const frontendOrigin = configService.get<string>('FRONTEND_ORIGIN', '*');
+  const isWildcard = frontendOrigin === '*';
   app.enableCors({
-    origin: frontendOrigin,
+    origin: isWildcard
+      ? true
+      : frontendOrigin.includes(',')
+      ? frontendOrigin.split(',').map((s) => s.trim())
+      : frontendOrigin,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
