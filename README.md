@@ -43,8 +43,8 @@ flowchart TD
         PostgresDB[("PostgreSQL 16 Engine<br/>SQL Check Constraints & Cascades")]
     end
 
-    Browser -->|HTTPS Request| VercelCDN
-    VercelCDN -->|REST API Calls (JSON)| NestApp
+    Browser -->|"HTTPS Request"| VercelCDN
+    VercelCDN -->|"REST API Calls (JSON)"| NestApp
     NestApp --> HealthCtrl
     NestApp --> MoviesCtrl
     NestApp --> CinemasCtrl
@@ -59,8 +59,8 @@ flowchart TD
     KnapsackDP --> PrismaService
     HealthCtrl --> PrismaService
 
-    PrismaService -->|Queries & Transactions| PgBouncer
-    PrismaService -->|Schema Migrations| DirectSession
+    PrismaService -->|"Queries & Transactions"| PgBouncer
+    PrismaService -->|"Schema Migrations"| DirectSession
     PgBouncer --> PostgresDB
     DirectSession --> PostgresDB
 ```
@@ -121,14 +121,14 @@ In addition to application DTO validation, data integrity is guaranteed directly
 flowchart TD
     Start(["Start Cycle Detection"]) --> Init["Initialize Node States:<br/>0 = WHITE (Unvisited)<br/>1 = GRAY (In Recursion Stack)<br/>2 = BLACK (Completed Acyclic)"]
     Init --> SelectNode{"Has Unvisited<br/>WHITE Node?"}
-    SelectNode -- Yes --> DFS["Enter DFS(u)"]
-    SelectNode -- No --> Valid(["No Cycle Detected<br/>Commit Transaction"])
+    SelectNode -- "Yes" --> DFS["Enter DFS(u)"]
+    SelectNode -- "No" --> Valid(["No Cycle Detected<br/>Commit Transaction"])
 
     DFS --> MarkGray["Mark node u = GRAY (1)"]
     MarkGray --> LoopNeighbors{"Has Next<br/>Neighbor v?"}
 
-    LoopNeighbors -- Yes --> CheckColor{"Color of<br/>Neighbor v?"}
-    CheckColor -- "GRAY (1)" --> CycleFound(["CYCLE DETECTED!<br/>Back-edge u -> v found"])
+    LoopNeighbors -- "Yes" --> CheckColor{"Color of<br/>Neighbor v?"}
+    CheckColor -- "GRAY (1)" --> CycleFound(["CYCLE DETECTED!<br/>Back-edge u to v detected"])
     CycleFound --> Rollback(["Abort Transaction<br/>HTTP 409 CIRCULAR_DEPENDENCY"])
 
     CheckColor -- "WHITE (0)" --> Recurse["DFS(v)"]
@@ -136,7 +136,7 @@ flowchart TD
 
     CheckColor -- "BLACK (2)" --> LoopNeighbors
 
-    LoopNeighbors -- No --> MarkBlack["Mark node u = BLACK (2)<br/>Remove from Recursion Stack"]
+    LoopNeighbors -- "No" --> MarkBlack["Mark node u = BLACK (2)<br/>Remove from Recursion Stack"]
     MarkBlack --> SelectNode
 ```
 
@@ -172,20 +172,20 @@ flowchart LR
 ```mermaid
 flowchart TD
     Input(["Input: Group Size G, Bundles [s1, s2, ... sk]"]) --> ParityCheck{"Check Parity:<br/>Are all bundles even<br/>AND G is odd?"}
-    ParityCheck -- Yes --> ImpossibleEarly(["Exact Partition Impossible<br/>(4a + 6b = Even != Odd)"])
+    ParityCheck -- "Yes" --> ImpossibleEarly(["Exact Partition Impossible<br/>(4a + 6b = Even != Odd)"])
 
-    ParityCheck -- No --> InitDP["Initialize DP Table:<br/>dp[0] = 0<br/>dp[1..G] = Infinity<br/>choice[1..G] = 0"]
+    ParityCheck -- "No" --> InitDP["Initialize DP Table:<br/>dp[0] = 0<br/>dp[1..G] = Infinity<br/>choice[1..G] = 0"]
 
     InitDP --> OuterLoop{"For w = 1 to G"}
-    OuterLoop -- Done --> CheckResult{"Is dp[G] < Infinity?"}
+    OuterLoop -- "Done" --> CheckResult{"Is dp[G] < Infinity?"}
 
-    OuterLoop -- Next w --> InnerLoop{"For each bundle s"}
-    InnerLoop -- s <= w --> UpdateDP["If dp[w - s] + 1 < dp[w]:<br/>dp[w] = dp[w - s] + 1<br/>choice[w] = s"]
+    OuterLoop -- "Next w" --> InnerLoop{"For each bundle s"}
+    InnerLoop -- "s <= w" --> UpdateDP["If dp[w - s] + 1 < dp[w]:<br/>dp[w] = dp[w - s] + 1<br/>choice[w] = s"]
     UpdateDP --> InnerLoop
-    InnerLoop -- Done --> OuterLoop
+    InnerLoop -- "Done" --> OuterLoop
 
-    CheckResult -- No --> Impossible(["possible: false<br/>totalBundles: null"])
-    CheckResult -- Yes --> Backtrack["Backtrack using choice array:<br/>rem = G<br/>While rem > 0:<br/>  s = choice[rem]<br/>  tally[s]++<br/>  rem -= s"]
+    CheckResult -- "No" --> Impossible(["possible: false<br/>totalBundles: null"])
+    CheckResult -- "Yes" --> Backtrack["Backtrack using choice array:<br/>rem = G<br/>While rem > 0:<br/>  s = choice[rem]<br/>  tally[s]++<br/>  rem -= s"]
     Backtrack --> Success(["possible: true<br/>totalBundles: dp[G]<br/>bundles: [{size, count}]"])
 ```
 
@@ -254,8 +254,8 @@ flowchart LR
         SupabaseDB["Supabase Hosted PostgreSQL<br/>Tokyo ap-northeast-1<br/>PgBouncer Pooler"]
     end
 
-    VercelEdge -->|HTTP API Requests| RenderService
-    RenderService -->|SQL Connection Pool| SupabaseDB
+    VercelEdge -->|"HTTP API Requests"| RenderService
+    RenderService -->|"SQL Connection Pool"| SupabaseDB
 ```
 
 ### Why Free-Tier Backends Have an Initial Cold Start:
