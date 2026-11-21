@@ -6,9 +6,10 @@ export interface EnvironmentVariables {
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
-  const nodeEnv = (config.NODE_ENV as string) || 'development';
+  const rawNodeEnv = typeof config.NODE_ENV === 'string' ? config.NODE_ENV.trim().toLowerCase() : '';
+  const nodeEnv = (rawNodeEnv || 'development') as 'development' | 'production' | 'test';
   if (!['development', 'production', 'test'].includes(nodeEnv)) {
-    throw new Error(`Invalid NODE_ENV: ${nodeEnv}. Must be development, production, or test.`);
+    throw new Error(`Invalid NODE_ENV: ${config.NODE_ENV}. Must be development, production, or test.`);
   }
 
   const rawPort = config.API_PORT ?? 3000;
