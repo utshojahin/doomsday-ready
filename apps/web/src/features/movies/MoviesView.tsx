@@ -9,6 +9,7 @@ import {
   IconSearch,
   IconClock,
   IconFilm,
+  IconTrash,
 } from '../../components/Icons';
 import { ApiError } from '../../api/client';
 
@@ -20,6 +21,7 @@ interface MoviesViewProps {
   onToggleWatched: (movieId: string) => Promise<void>;
   onAddMovie: (movie: CreateMovieInput) => Promise<void>;
   onUpdateMovie: (id: string, movie: UpdateMovieInput) => Promise<void>;
+  onDeleteMovie?: (id: string) => Promise<void>;
 }
 
 export const MoviesView: React.FC<MoviesViewProps> = ({
@@ -30,6 +32,7 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
   onToggleWatched,
   onAddMovie,
   onUpdateMovie,
+  onDeleteMovie,
 }) => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'watched' | 'unwatched'>('all');
@@ -37,6 +40,10 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
   const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  // Delete confirmation state
+  const [confirmDeleteMovie, setConfirmDeleteMovie] = useState<Movie | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Form states
   const [title, setTitle] = useState('');
@@ -91,6 +98,28 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
       }
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const handleDelete = async (movie: Movie) => {
+    if (!onDeleteMovie) return;
+    setActionError(null);
+    setIsDeleting(true);
+
+    try {
+      await onDeleteMovie(movie.id);
+      setConfirmDeleteMovie(null);
+      if (editingMovie?.id === movie.id) {
+        setIsModalOpen(false);
+      }
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        setActionError(err.message);
+      } else {
+        setActionError('Failed to delete movie.');
+      }
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -381,8 +410,8 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
             </div>
 
             {/* Prerequisites */}
-            <div className="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs">
-              <div className="flex-1 pr-2">
+            <div className="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs gap-2">
+              <div className="flex-1 pr-1">
                 <span className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider block mb-1">
                   Required Prerequisites:
                 </span>
@@ -409,12 +438,23 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
                 )}
               </div>
 
-              <button
-                onClick={() => openEditModal(movie)}
-                className="text-xs text-indigo-400 hover:text-indigo-300 py-1 px-2 rounded bg-indigo-950/40 border border-indigo-900/40 font-medium shrink-0"
-              >
-                Edit
-              </button>
+              <div className="flex items-center space-x-1.5 shrink-0">
+                <button
+                  onClick={() => openEditModal(movie)}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 py-1 px-2 rounded bg-indigo-950/40 border border-indigo-900/40 font-medium"
+                >
+                  Edit
+                </button>
+                {onDeleteMovie && (
+                  <button
+                    onClick={() => setConfirmDeleteMovie(movie)}
+                    className="p-1 rounded bg-rose-950/30 text-rose-400 hover:text-rose-200 border border-rose-900/30"
+                    title="Delete movie"
+                  >
+                    <IconTrash className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -437,7 +477,7 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
                 <th className="py-3 px-4 w-24">Year</th>
                 <th className="py-3 px-4 w-28">Runtime</th>
                 <th className="py-3 px-4">Prerequisites</th>
-                <th className="py-3 px-4 w-20 text-right">Action</th>
+                <th className="py-3 px-4 w-28 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -514,14 +554,25 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
                     )}
                   </td>
 
-                  {/* Edit */}
+                  {/* Edit / Delete Buttons */}
                   <td className="py-3 px-4 text-right">
-                    <button
-                      onClick={() => openEditModal(movie)}
-                      className="text-slate-400 hover:text-slate-200 text-xs px-2.5 py-1 rounded hover:bg-slate-800 transition-colors"
-                    >
-                      Edit
-                    </button>
+                    <div className="flex items-center justify-end space-x-1.5">
+                      <button
+                        onClick={() => openEditModal(movie)}
+                        className="text-slate-400 hover:text-slate-200 text-xs px-2.5 py-1 rounded hover:bg-slate-800 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      {onDeleteMovie && (
+                        <button
+                          onClick={() => setConfirmDeleteMovie(movie)}
+                          title="Delete movie"
+                          className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors"
+                        >
+                          <IconTrash className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -652,27 +703,81 @@ export const MoviesView: React.FC<MoviesViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  disabled={isSaving}
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition-colors disabled:opacity-40"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-colors disabled:opacity-50 flex items-center space-x-1.5"
-                >
-                  {isSaving && (
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  )}
-                  <span>{isSaving ? 'Saving...' : editingMovie ? 'Save Changes' : 'Create Movie'}</span>
-                </button>
+              <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                {editingMovie && onDeleteMovie ? (
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => setConfirmDeleteMovie(editingMovie)}
+                    className="flex items-center space-x-1.5 text-xs text-rose-400 hover:text-rose-300 px-2 py-1.5 rounded hover:bg-rose-950/30 transition-colors"
+                  >
+                    <IconTrash className="w-3.5 h-3.5" />
+                    <span>Delete Movie</span>
+                  </button>
+                ) : (
+                  <div></div>
+                )}
+
+                <div className="flex space-x-2">
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition-colors disabled:opacity-40"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-colors disabled:opacity-50 flex items-center space-x-1.5"
+                  >
+                    {isSaving && (
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                    <span>{isSaving ? 'Saving...' : editingMovie ? 'Save Changes' : 'Create Movie'}</span>
+                  </button>
+                </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {confirmDeleteMovie && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full shadow-2xl p-5 space-y-4">
+            <div className="flex items-center space-x-2.5 text-rose-400">
+              <IconAlertCircle className="w-5 h-5 shrink-0" />
+              <h3 className="text-sm font-bold text-white">Delete Movie</h3>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to delete <strong className="text-white">"{confirmDeleteMovie.title}"</strong>? This will permanently remove the movie and its prerequisite links from the database.
+            </p>
+
+            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setConfirmDeleteMovie(null)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => handleDelete(confirmDeleteMovie)}
+                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center space-x-1.5 disabled:opacity-50"
+              >
+                {isDeleting && (
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                )}
+                <span>{isDeleting ? 'Deleting...' : 'Confirm Delete'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

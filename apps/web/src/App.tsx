@@ -4,7 +4,7 @@ import { Navbar, ActiveTab } from './components/Navbar';
 import { MoviesView } from './features/movies/MoviesView';
 import { RewatchPlanView } from './features/rewatch/RewatchPlanView';
 import { BookingView } from './features/booking/BookingView';
-import { fetchMovies, fetchCinemas, createMovie, updateMovie } from './api/client';
+import { fetchMovies, fetchCinemas, createMovie, updateMovie, deleteMovie } from './api/client';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('movies');
@@ -64,6 +64,11 @@ export const App: React.FC = () => {
     setMovies((prev) => prev.map((m) => (m.id === id ? updated : m)));
   };
 
+  const handleDeleteMovie = async (id: string) => {
+    await deleteMovie(id);
+    setMovies((prev) => prev.filter((m) => m.id !== id));
+  };
+
   const handleCinemaCreated = async () => {
     await loadCinemas();
   };
@@ -88,6 +93,7 @@ export const App: React.FC = () => {
             onToggleWatched={handleToggleWatched}
             onAddMovie={handleAddMovie}
             onUpdateMovie={handleUpdateMovie}
+            onDeleteMovie={handleDeleteMovie}
           />
         )}
 

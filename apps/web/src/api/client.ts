@@ -90,6 +90,12 @@ export async function updateMovie(id: string, data: UpdateMovieInput): Promise<M
   });
 }
 
+export async function deleteMovie(id: string): Promise<void> {
+  return request<void>(`/movies/${id}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function fetchRewatchOrder(movieId: string): Promise<RewatchPlan> {
   return request<RewatchPlan>(`/movies/${movieId}/rewatch-order`);
 }

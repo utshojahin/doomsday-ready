@@ -239,6 +239,19 @@ export class MoviesService {
     return result;
   }
 
+  async remove(id: string): Promise<void> {
+    const movie = await this.prisma.movie.findUnique({
+      where: { id },
+    });
+    if (!movie) {
+      throw new NotFoundException(`Movie with ID '${id}' not found.`);
+    }
+
+    await this.prisma.movie.delete({
+      where: { id },
+    });
+  }
+
   private mapToDto(movie: MovieWithPrerequisites): MovieResponseDto {
     const prereqList: PrerequisiteMovieDto[] = movie.prerequisites.map((p) => ({
       id: p.prerequisite.id,

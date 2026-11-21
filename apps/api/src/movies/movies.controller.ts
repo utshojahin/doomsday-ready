@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   HttpCode,
@@ -84,5 +85,17 @@ export class MoviesController {
     @Body() updateMovieDto: UpdateMovieDto,
   ): Promise<MovieResponseDto> {
     return this.moviesService.update(id, updateMovieDto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a movie and its prerequisite relationships' })
+  @ApiParam({ name: 'id', description: 'Movie UUID' })
+  @ApiResponse({ status: 204, description: 'Movie deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Movie not found' })
+  async remove(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<void> {
+    return this.moviesService.remove(id);
   }
 }

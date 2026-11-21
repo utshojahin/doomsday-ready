@@ -5,9 +5,9 @@ import {
   IconPlus,
   IconAlertCircle,
   IconCheck,
-  IconX,
   IconTicket,
   IconSparkles,
+  IconX,
 } from '../../components/Icons';
 
 interface BookingViewProps {
@@ -21,7 +21,18 @@ export const BookingView: React.FC<BookingViewProps> = ({
   isLoading: isCinemasLoading = false,
   onCinemaCreated,
 }) => {
-  const [selectedCinemaId, setSelectedCinemaId] = useState<string>(cinemas[0]?.id || '');
+  // Helper to pick a smart default venue where initial groupSize (11) is solvable
+  const getPreferredCinemaId = (list: Cinema[]): string => {
+    const stark = list.find((c) => c.name.includes('Stark'));
+    if (stark) return stark.id;
+    const oddBundle = list.find((c) => c.bundleSizes.some((s) => s % 2 !== 0));
+    if (oddBundle) return oddBundle.id;
+    return list[0]?.id || '';
+  };
+
+  const [selectedCinemaId, setSelectedCinemaId] = useState<string>(() =>
+    getPreferredCinemaId(cinemas),
+  );
   const [groupSize, setGroupSize] = useState<number>(11);
   const [quote, setQuote] = useState<BookingQuote | null>(null);
   const [isQuoteLoading, setIsQuoteLoading] = useState<boolean>(false);
@@ -34,14 +45,15 @@ export const BookingView: React.FC<BookingViewProps> = ({
   const [modalError, setModalError] = useState<string | null>(null);
   const [isCreatingCinema, setIsCreatingCinema] = useState(false);
 
-  // Sync selected cinema if list updates
+  // Sync selected cinema if list updates and current selection is empty or invalid
   useEffect(() => {
     if (cinemas.length > 0 && !cinemas.some((c) => c.id === selectedCinemaId)) {
-      setSelectedCinemaId(cinemas[0].id);
+      setSelectedCinemaId(getPreferredCinemaId(cinemas));
     }
   }, [cinemas, selectedCinemaId]);
 
-  const selectedCinema = cinemas.find((c) => c.id === selectedCinemaId) || cinemas[0];
+  const selectedCinema =
+    cinemas.find((c) => c.id === selectedCinemaId) || cinemas[0];
 
   const loadQuote = useCallback(async (cinemaId: string, size: number) => {
     if (!cinemaId) {
@@ -139,46 +151,50 @@ export const BookingView: React.FC<BookingViewProps> = ({
 
   const starkCinema = cinemas.find((c) => c.name.includes('Stark'));
   const odinCinema = cinemas.find((c) => c.name.includes('Odin'));
-  const sanctumCinema = cinemas.find((c) => c.name.includes('Sanctum'));
+  const sanctumCinema = cinemas.find((c) => c.name.includes('Sanctum') || (c.bundleSizes.length === 2 && c.bundleSizes.includes(4) && c.bundleSizes.includes(6)));
   const dpTestCinema = cinemas.find((c) => c.bundleSizes.includes(1) && c.bundleSizes.includes(3) && c.bundleSizes.includes(4));
 
   const assessmentBenchmarks = [
     {
       title: 'Benchmark 1: DP Beats Greedy',
-      venue: dpTestCinema?.name || 'IMAX Premiere',
+      venue: dpTestCinema?.name || 'Assessment DP Cinema [1, 3, 4]',
       venueId: dpTestCinema?.id || selectedCinema?.id,
       seats: 6,
       bundles: '[1, 3, 4]',
-      expected: '2 bundles of 3 (DP beats greedy 4+1+1)',
+      expected: 'Optimal: 2 bundles of 3 (beats greedy 4+1+1)',
     },
     {
-      title: 'Benchmark 2: Mixed Combinations',
-      venue: starkCinema?.name || 'Stark IMAX',
+      title: 'Benchmark 2: Mixed Packages',
+      venue: starkCinema?.name || 'Stark IMAX Theatre',
       venueId: starkCinema?.id || selectedCinema?.id,
       seats: 11,
       bundles: '[2, 5]',
-      expected: '1 × 5 seats + 3 × 2 seats = 4 bundles',
+      expected: 'Optimal: 1 × 5 seats + 3 × 2 seats = 4 bundles',
     },
     {
       title: 'Benchmark 3: Larger Party Scale',
-      venue: odinCinema?.name || 'Odin Odeon',
+      venue: odinCinema?.name || 'Odin Odeon Screen',
       venueId: odinCinema?.id || selectedCinema?.id,
       seats: 44,
       bundles: '[6, 9, 20]',
-      expected: '1 × 20 seats + 2 × 9 seats + 1 × 6 seats',
+      expected: 'Optimal: 1 × 20 seats + 2 × 9 seats + 1 × 6 seats',
     },
     {
-      title: 'Benchmark 4: Impossible Partition',
-      venue: sanctumCinema?.name || 'Sanctum Cinema',
+      title: 'Benchmark 4: Impossible Partition Test',
+      venue: sanctumCinema?.name || 'Sanctum Sanctorum Cinema',
       venueId: sanctumCinema?.id || selectedCinema?.id,
       seats: 7,
       bundles: '[4, 6]',
-      expected: 'Impossible (odd seats with only even bundles)',
+      expected: 'Accurately detects impossible partition',
     },
   ];
 
+  // Helper check if venue only offers even bundles
+  const allBundlesEven = selectedCinema && selectedCinema.bundleSizes.every((s) => s % 2 === 0);
+  const isOddGroupSize = groupSize % 2 !== 0;
+
   return (
-    <div className="space-y-6 pb-20 sm:pb-8">
+    <div className="space-y-6 pb-20 sm:pb-8 pt-2">
       {/* Header Banner */}
       <div className="bg-slate-900/90 p-4 sm:p-5 rounded-2xl border border-slate-800 shadow-sm space-y-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -188,7 +204,7 @@ export const BookingView: React.FC<BookingViewProps> = ({
               <h2 className="text-base font-bold text-white">Opening Night Ticket Bundle Optimizer</h2>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Opening night ticket packages are sold in fixed seat bundles. This unbounded dynamic programming optimizer computes the exact minimum number of packages needed for your party with zero wasted seats.
+              Opening night ticket packages are sold strictly in fixed seat bundles. This unbounded dynamic programming optimizer computes the exact minimum number of packages needed for your party with zero wasted seats.
             </p>
           </div>
 
@@ -232,7 +248,7 @@ export const BookingView: React.FC<BookingViewProps> = ({
                   {bench.seats} Seats
                 </span>
               </div>
-              <div className="text-xs text-slate-200 font-medium">{bench.venue}</div>
+              <div className="text-xs text-slate-200 font-medium truncate">{bench.venue}</div>
               <div className="text-[11px] text-slate-400 font-mono">Bundles: {bench.bundles}</div>
               <p className="text-[10px] text-emerald-400/90 font-medium pt-0.5">{bench.expected}</p>
             </button>
@@ -319,7 +335,7 @@ export const BookingView: React.FC<BookingViewProps> = ({
             <div className="flex items-center space-x-2">
               <IconTicket className="w-4 h-4 text-indigo-400" />
               <h3 className="text-xs sm:text-sm font-bold text-white">
-                Ticket Allocation Quote · {selectedCinema?.name}
+                Ticket Allocation Result · {selectedCinema?.name}
               </h3>
             </div>
             <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
@@ -367,7 +383,7 @@ export const BookingView: React.FC<BookingViewProps> = ({
                     DP Optimality Proof
                   </span>
                   <p className="mt-1 text-xs text-slate-300 leading-relaxed">
-                    Unbounded knapsack dynamic programming evaluates all valid combinations to guarantee the minimum bundle count.
+                    Unbounded knapsack dynamic programming evaluates all combinations to guarantee minimal bundle transactions.
                   </p>
                 </div>
               </div>
@@ -404,18 +420,52 @@ export const BookingView: React.FC<BookingViewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="p-8 sm:p-10 text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-rose-950/50 border border-rose-800 text-rose-400 flex items-center justify-center mx-auto">
-                <IconX className="w-6 h-6 stroke-[2.5]" />
-              </div>
-              <h4 className="text-base font-bold text-rose-300">Exact Seating Impossible</h4>
-              <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                It is mathematically impossible to seat exactly <strong className="text-white">{quote.groupSize}</strong> attendees using the available bundle sizes ({selectedCinema?.bundleSizes.join(', ')} seats) without leaving empty seats.
-              </p>
-              <div className="pt-2">
-                <span className="inline-block px-3 py-1.5 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 text-xs font-mono">
-                  State: Not Possible (No valid exact partition exists)
-                </span>
+            <div className="p-6 sm:p-8 space-y-4">
+              <div className="bg-slate-950/80 p-4 sm:p-5 rounded-xl border border-amber-900/40 space-y-3">
+                <div className="flex items-center space-x-2 text-amber-400">
+                  <IconAlertCircle className="w-5 h-5 shrink-0" />
+                  <h4 className="text-sm font-bold text-slate-100">
+                    Exact Seating Partition Not Possible
+                  </h4>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/60 ml-auto">
+                    Not Possible
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  No combination of available packages (<span className="font-mono text-white">{selectedCinema?.bundleSizes.join(', ')} seats</span>) can sum to exactly <strong className="text-white">{quote.groupSize} seats</strong> without leaving empty seats.
+                </p>
+
+                {allBundlesEven && isOddGroupSize && (
+                  <div className="text-xs text-slate-400 bg-slate-900/90 p-3 rounded-lg border border-slate-800 space-y-1">
+                    <span className="text-[11px] font-semibold text-slate-300 block">
+                      Mathematical Reason:
+                    </span>
+                    <p className="text-[11px]">
+                      This venue only offers packages with even capacities ({selectedCinema?.bundleSizes.join(', ')}). Any linear combination of even numbers is always even ($4a + 6b = \text{even}$). Because your party size ({quote.groupSize}) is odd, exact partition is impossible.
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-2 flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-slate-400">Suggestions:</span>
+                  {allBundlesEven && isOddGroupSize && (
+                    <button
+                      onClick={() => setGroupSize(quote.groupSize + 1)}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors"
+                    >
+                      Try {quote.groupSize + 1} seats (Even)
+                    </button>
+                  )}
+                  {starkCinema && selectedCinemaId !== starkCinema.id && (
+                    <button
+                      onClick={() => setSelectedCinemaId(starkCinema.id)}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-950/70 hover:bg-indigo-900/70 text-indigo-300 text-xs font-medium border border-indigo-800/60 transition-colors"
+                    >
+                      Switch to Stark IMAX (offers 5-seat packages)
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
